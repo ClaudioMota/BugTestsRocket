@@ -1,6 +1,6 @@
 # 🐛 Tests 🚀
 
-Welcome to your C testing framework built focusing on simplicity and readability.
+Welcome to your C testing framework built focusing simplicity and readability.
 
 ## Main characteristics
 - Readable: The syntax was designed to be readable and clean.
@@ -17,7 +17,7 @@ Here is an example of a test file written using the framework:
 🐛
 context("sum")
 {
-  test("should add the first to the second")
+  test("adds the first to the second")
   {
     assert(sum(2, 1) == 3);
   }
@@ -25,12 +25,12 @@ context("sum")
 
 context("divide")
 {
-  test("should divide the first by the second")
+  test("divides the first by the second")
   {
     assert(divide(6,2) == 3);
   }
 
-  test("should perform integer division")
+  test("performs integer division")
   {
     refute(divide(3,2) != 1);
   }
@@ -73,6 +73,17 @@ int main(int numArgs, char** args)
 ```
 
 You can always change it for adding the functionalities your project require.
+
+### Runner parameters
+
+The accepted parameters for the test runner are the following:
+
+```bash
+build/tests/test [options]
+--module PARTIAL_PATH_OR_CONTEXT # Runs tests of all matching files/contexts
+--line LINE_NUMBER               # Runs all tests that are defined at the given line
+PARTIAL_PATH:LINE_NUMBER         # Same as --module PARTIAL_PATH --line LINE_NUMBER       
+```
 
 ## Building and running this repo
 ### Dependencies
