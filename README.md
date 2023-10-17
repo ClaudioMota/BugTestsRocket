@@ -74,6 +74,32 @@ int main(int numArgs, char** args)
 
 You can always change it for adding the functionalities your project require.
 
+## Building and running this repo
+### Dependencies
+- make
+- gcc
+- git
+
+Run the following commands for build and runnning the tests:
+```bash
+# Downloads the project
+git clone https://github.com/ClaudioMota/BugTestsRocket.git
+# Sets the working directory
+cd BugTestsRocket
+# Builds the project and runs the tests
+make test
+# After that you can run the tests directly by typing:
+build/tests/test
+```
+The output of the tests should be something like:
+```bash
+build/tests/test
+.
+[FAIL] on "subtract" test "subtracts the first by the second" failed tests/exampleCalc.c:19 (subtract(1, 2) == -1)
+....
+[FAIL] on "divRemainder" test "retrieves false on division by zero" failed tests/exampleCalc.c:63 (SIGFPE)
+```
+
 ## Pitfalls
 ### Scopes and tests structure
 As the test macros are state machines and will be set in any point you call them, any aparent scope structure is just syntax suggar. For example:
