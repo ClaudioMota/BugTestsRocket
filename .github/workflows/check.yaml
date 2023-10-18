@@ -20,7 +20,7 @@ jobs:
 
       - name: Test
         run: |
-          set -e 2
+          set -e 1
           test=$(build/tests/test)
           if [ $? != 2 ]; then
             exit 1
