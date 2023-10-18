@@ -19,8 +19,8 @@ jobs:
           make
 
       - name: Test
-        continue-on-error: true
         run: |
+          set -e 2
           test=$(build/tests/test)
           if [ $? != 2 ]; then
             exit 1
