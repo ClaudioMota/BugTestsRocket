@@ -22,7 +22,7 @@
 
 #define _TEST_HELPER_BLOCK_SIZE 1024
 #define assert(boolean) _assert(testEnv, boolean, __LINE__, #boolean)
-#define refute(boolean) _refute(testEnv, boolean, __LINE__, #boolean)
+#define refute(boolean) _assert(testEnv, !(boolean), __LINE__, #boolean)
 #define context(name) _context = name;
 
 #define beginTests \
@@ -174,11 +174,6 @@ void _assert(_TestEnvironment* env, bool assertion, int line, char* expr)
   if(!assertion) onFail(env, line, expr);
 }
 
-void _refute(_TestEnvironment* env, bool assertion, int line, char* expr)
-{
-  if(assertion) onFail(env, line, expr);
-}
-
 _TestSelect _getArgsSelection(int numArgs, char** args)
 {
   _TestSelect ret = {0};
@@ -227,7 +222,7 @@ _TestSelect _getArgsSelection(int numArgs, char** args)
   return ret;
 }
 
-int runTest(char* testProgram)
+int _doRunTest(char* testProgram)
 {
   fflush(NULL);
   FILE* output = popen(testProgram, "r");
@@ -245,6 +240,69 @@ int runTest(char* testProgram)
   return WEXITSTATUS(status);
 }
 
+// Allocates and sets to output a list with all test files in the directory and subdirectories of the test runner
+// Returns the count of files
+bool _isDirectory(char* file);
+int _listFiles(char* dir, char** output);
+void _getDir(char* file, char* output)
+{
+  char* aux, *last = file + strlen(file);
+  aux = file;
+  while(aux)
+  {
+    last = aux;
+    aux = strstr(aux, "/");
+    if(aux) aux++;
+  }
+  memcpy(output, file, last - file);
+  output[last - file] = '\0';
+}
+
+int findAllTestFiles(char* testRunnerPath, char*** output)
+{
+  int index = 0, count = 0, capacity = 0, filteredCount = 0;
+  *output = 0;
+
+  char* baseDirPath = malloc(strlen(testRunnerPath) + 1);
+  _getDir(testRunnerPath, baseDirPath);
+  
+  if(!_isDirectory(baseDirPath)) return 0;
+  capacity = 1;
+  *output = malloc(sizeof(char*)*capacity);
+  (*output)[count++] = baseDirPath;
+  while(index < count)
+  {
+    if(_isDirectory((*output)[index]))
+    {
+      int dirFileCount = _listFiles((*output)[index], 0);
+      while(count + dirFileCount >= capacity)
+      {
+        capacity *= 2;
+        *output = realloc(*output, sizeof(char*)*capacity);
+      }
+      _listFiles((*output)[index], *output + count);
+      count += dirFileCount;
+    }
+
+    index++;
+  }
+  
+  for(int i = 0; i < count; i++)
+  {
+    if(_isDirectory((*output)[i]) || strcmp((*output)[i], testRunnerPath) == 0)
+    {
+      free((*output)[i]);
+      filteredCount++;
+    }
+    else
+    {
+      (*output)[i-filteredCount] = (*output)[i];
+    }
+  }
+
+  return count - filteredCount;
+}
+
 int runTestsForFile(int numArgs, char** args, char* file)
 {
   int failures = 0;
@@ -259,7 +317,7 @@ int runTestsForFile(int numArgs, char** args, char* file)
 
   char program[(strlen(file)+64)*4];
   strcpy(program, file);
-  int count = runTest(program);
+  int count = _doRunTest(program);
   for(int j = 0; j < count; j++)
   {
     char strIndex[64] = {0};
@@ -267,7 +325,7 @@ int runTestsForFile(int numArgs, char** args, char* file)
     sprintf(strIndex, " --index %i", j);
     strcat(program, fixedParams);
     strcat(program, strIndex);
-    if(!runTest(program))
+    if(!_doRunTest(program))
       failures++;
   }
 
@@ -276,14 +334,23 @@ int runTestsForFile(int numArgs, char** args, char* file)
   return failures;
 }
 
-int runTestsForFiles(int numArgs, char** args, int fileCount, char** files)
+int runAllTests(int numArgs, char** args)
 {
+  char** files = 0;
+  int fileCount = findAllTestFiles(args[0], &files);
+  
   int failures = 0;
 
   for(int i = 0; i < fileCount; i++)
     failures += runTestsForFile(numArgs, args, files[i]);
 
-  _freeArgsCopy();
+  if(files)
+  {
+    for(int i = 0; i < fileCount; i++)
+      free(files[i]);
+    free(files);
+  }
+  
   return failures;
 }
 
@@ -303,4 +370,91 @@ int _testFileMain(int numArgs, char** args, int (*_allTests)(_TestEnvironment*))
   return _testCount;
 }
 
+#ifdef _WIN32
+#include <windows.h>
+
+int _listFiles(char* path, char** output)
+{
+  char basePath[MAX_PATH];
+	char wildPath[MAX_PATH];
+	int fileCount = 0;
+	WIN32_FIND_DATA ffd;
+	HANDLE hFind = INVALID_HANDLE_VALUE;
+
+	strcpy(basePath, path);
+  if(path[strlen(path-1)] != '/')
+    strcat(basePath, "/");
+  strcpy(wildPath, basePath);
+	strcat(wildPath,"*");
+
+	int basePathLength = strlen(basePath);
+	hFind = FindFirstFile(wildPath, &ffd);
+	if (INVALID_HANDLE_VALUE == hFind)
+	  return 0;
+
+	do
+	{
+	  if(strcmp(".", ffd.cFileName) != 0 && strcmp("..", ffd.cFileName) != 0)
+	  {
+      if(output)
+      {
+        output[fileCount] = malloc(basePathLength + strlen(ffd.cFileName) + 2);
+	      strcpy(output[fileCount], basePath);
+        strcat(output[fileCount], ffd.cFileName);
+      }
+      fileCount++;
+	  }
+	}
+	while (FindNextFile(hFind, &ffd) != 0);
+
+	FindClose(hFind);
+
+	return fileCount;
+}
+#else
+#include <dirent.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+bool _isDirectory(char* path)
+{
+  struct stat stats;
+  if(stat(path, &stats) == 0)
+  {
+    if(S_ISDIR(stats.st_mode)) return true;
+  }
+  return false;
+}
+
+int _listFiles(char* path, char** output)
+{
+  int fileCount = 0;
+  DIR *dir;
+	struct dirent *ent;
+  int pathLength = strlen(path);
+
+	if ((dir = opendir (path)) != 0) 
+  {
+	  while ((ent = readdir (dir)) != 0)
+    {
+      if(strcmp(".", ent->d_name) != 0 && strcmp("..", ent->d_name) != 0)
+      {
+        if(output)
+        {
+          output[fileCount] = malloc(pathLength + strlen(ent->d_name) + 2);
+          strcpy(output[fileCount], path);
+          if(path[pathLength-1] != '\\' && path[pathLength-1] != '/')
+            strcat(output[fileCount], "/");
+          strcat(output[fileCount], ent->d_name);
+        }
+        fileCount++; 
+      }
+	  }
+	  closedir (dir);
+	}
+  
+  return fileCount;
+}
+#endif
 #endif
