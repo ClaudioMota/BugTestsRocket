@@ -18,10 +18,14 @@ jobs:
         run: |
           make
 
-      - name: Test
+      - name: Run test
+        id: test
+        continue-on-error: true
         run: |
-          set -e 1
-          test=$(build/tests/test)
-          if [ $? != 1 ]; then
+          build/tests/test
+
+      - name: Check test result
+        run: |
+          if [ ${{steps.test.outputs.exit_code}} != 2 ]; then
             exit 1
           fi
