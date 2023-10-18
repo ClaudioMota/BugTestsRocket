@@ -23,9 +23,10 @@ jobs:
         continue-on-error: true
         run: |
           build/tests/test
+          exit_code=$?
 
       - name: Check test result
         run: |
-          if [ ${{steps.test.outputs.exit_code}} != 2 ]; then
+          if [ ${{steps.test.outputs.exit_code}} != 1 ]; then
             exit 1
           fi
