@@ -56,7 +56,7 @@ context("divRemainder")
     int result;
     assert(divRemainder(5, 2, &result));
     assert(result == 1);
-    assert(divRemainder(150, 10, &result));
+    assert(divRemainder(150, 10, &result))
     assert(result == 0);
   }
 
