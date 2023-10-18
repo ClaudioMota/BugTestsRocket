@@ -22,13 +22,13 @@ jobs:
         id: test
         continue-on-error: true
         run: |
-          echo "result=$?banana" >> "motherfucker"
+          echo "result=$?banana" >> "$GITHUB_OUTPUT"
           build/tests/test
           echo "result=$?banana" >> "$GITHUB_OUTPUT"
+          export result="1"
 
       - name: Check test result
         run: |
-          result="${{ steps.test.outputs.result }}"
           if [ "$result" != 1 ]; then
             exit 1
           fi
