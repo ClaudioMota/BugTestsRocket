@@ -23,10 +23,11 @@ jobs:
         continue-on-error: true
         run: |
           build/tests/test
-          echo "::set-output name=exit_code::$?"
+          echo "::set-output name=result::$?banana"
 
       - name: Check test result
         run: |
-          if [ "${{ steps.test.outputs.exit_code }}" != 1 ]; then
+          result="${{ steps.test.outputs.result }}"
+          if [ "$result" != 1 ]; then
             exit 1
           fi
