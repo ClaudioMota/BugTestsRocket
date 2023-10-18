@@ -26,7 +26,7 @@
 #define context(name) _context = name;
 
 #define beginTests \
-  int _allTests(_TestEnvironment* testEnv){ char* _context = ""; if(_context){}; int _testCount = 0; int _testRunning = 0; {
+  int _allTests(TestEnvironment* testEnv){ char* _context = ""; if(_context){}; int _testCount = 0; int _testRunning = 0; {
 
 #define _finishLastScope() if(_testRunning > 0){ _testRunning--; onTestPass(testEnv); } }
 
@@ -48,7 +48,7 @@
   }
 
 typedef struct _TestSelect _TestSelect;
-typedef struct _TestEnvironment _TestEnvironment;
+typedef struct TestEnvironment TestEnvironment;
 
 enum _TestSelectMode
 {
@@ -65,7 +65,7 @@ struct _TestSelect
   char* name;
 };
 
-struct _TestEnvironment
+struct TestEnvironment
 {
   char* testContext;
   int testIndex;
@@ -78,20 +78,20 @@ struct _TestEnvironment
   void* helperBlock[_TEST_HELPER_BLOCK_SIZE];
 };
 
-void _ignore(_TestEnvironment* env);
-void _defaultTestPass(_TestEnvironment* env);
-void _defaultFailure(_TestEnvironment* env, int line, char* expr);
+void _ignore(TestEnvironment* env);
+void _defaultTestPass(TestEnvironment* env);
+void _defaultFailure(TestEnvironment* env, int line, char* expr);
 
-void (*setupFunction)(_TestEnvironment* env) = _ignore;
-void (*cleanFunction)(_TestEnvironment* env) = _ignore;
-void (*onFail)(_TestEnvironment* env, int line, char* expr) = _defaultFailure;
-void (*onTestPass)(_TestEnvironment* env) = _defaultTestPass;
+void (*setupFunction)(TestEnvironment* env) = _ignore;
+void (*cleanFunction)(TestEnvironment* env) = _ignore;
+void (*onFail)(TestEnvironment* env, int line, char* expr) = _defaultFailure;
+void (*onTestPass)(TestEnvironment* env) = _defaultTestPass;
 void (*onRaise)(int) = (void*)_ignore;
 
 int __numArgsCopy;
 char** _argsCopy;
 char* _sourceFile;
-_TestEnvironment* _currentEnv = 0;
+TestEnvironment* _currentEnv = 0;
 
 char** _copyArgs(int numArgs, char** args)
 {
@@ -119,9 +119,9 @@ void _freeArgsCopy()
   _argsCopy = 0;
 }
 
-void _ignore(_TestEnvironment* env){}
+void _ignore(TestEnvironment* env){}
 
-bool _shouldRunTest(_TestEnvironment* env)
+bool _shouldRunTest(TestEnvironment* env)
 {
   int mode = env->selection.mode;
   if(mode == _TEST_SELECT_MODE_NONE) return false;
@@ -135,13 +135,13 @@ bool _shouldRunTest(_TestEnvironment* env)
   return true;
 }
 
-void _defaultTestPass(_TestEnvironment* env)
+void _defaultTestPass(TestEnvironment* env)
 {
   printf(".");
   cleanFunction(env);
 }
 
-void _defaultFailure(_TestEnvironment* env, int line, char* expr)
+void _defaultFailure(TestEnvironment* env, int line, char* expr)
 {
   if(env->testContext)
     printf("\n[FAIL] on \"%s\" test \"%s\" failed %s:%i (%s)\n", env->testContext, env->testDescription, _sourceFile, line, expr);
@@ -169,7 +169,7 @@ void _defaultRaiseHandler(int signum)
   onFail(_currentEnv, _currentEnv->testLine, signalStr);
 }
 
-void _assert(_TestEnvironment* env, bool assertion, int line, char* expr)
+void _assert(TestEnvironment* env, bool assertion, int line, char* expr)
 {
   if(!assertion) onFail(env, line, expr);
 }
@@ -354,16 +354,16 @@ int runAllTests(int numArgs, char** args)
   return failures;
 }
 
-int _testFileMain(int numArgs, char** args, int (*_allTests)(_TestEnvironment*))
+int _testFileMain(int numArgs, char** args, int (*_allTests)(TestEnvironment*))
 {
   args = _copyArgs(numArgs, args);
-  _TestEnvironment testEnv = {0};
+  TestEnvironment testEnv = {0};
   _currentEnv = &testEnv;
   int signals[] = {SIGABRT, SIGFPE, SIGILL, SIGINT, SIGSEGV, SIGTERM};
   for(int i = 0; i < sizeof(signals)/sizeof(int); i++)
     signal(signals[i], _defaultRaiseHandler);
   int _testCount = _allTests(&testEnv);
-  memset(&testEnv, 0, sizeof(_TestEnvironment));
+  memset(&testEnv, 0, sizeof(TestEnvironment));
   testEnv.selection = _getArgsSelection(numArgs, args);
   _allTests(&testEnv);
   _freeArgsCopy();

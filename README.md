@@ -9,7 +9,7 @@ Welcome to your C testing framework built focusing simplicity and readability.
 - Simple: It follows the KISS philosophy, keeping the framework to effectively two to three files of reasonable sizes.
 
 ## Example
-Here is an example of a test file written using the framework:
+Here is an example of a full test file written using the framework:
 
 ```C
 #include "test.h"
@@ -45,13 +45,14 @@ This repo itself is a working example so feel free to clone it and play around!
 For the framework to work, the project should follow some basic guidelines and standards.
 
 - Tests macros are state machines: Once you call a test macro the state is set, so the macros don't follow your scope structure. See `Pitfalls` section.
-- Test code != source code: tests may refer to source hearders, but their must binaries not be the same.
-- Each test file is a final executable: That means that test binaries should not be linked to other binaries that implement a main function.
-- Test output directory: All tests must be output to a test binary directory, so that the test runner can detect and run them automatically.
-- `tests/test.c` is the runner: This is just a convention, you should write a main function for running the all tests on this file.
+- Test code != source code: tests may refer to source hearders, but their binaries must not be the same.
+- Each test file is a final executable: Test binaries should not be linked to other binaries that implement a main function.
+- Test output directory: All tests must be output to a test binary only directory, so that the test runner can detect and run them automatically.
+- `tests/test.c` is the runner: This is just a convention, this file will have a main function that will run all tests. See `Tests runner` section.
+- 🐛 Tests(only) 🚀: Helper functions must be written outside the 🐛 🚀 guards as the whole framework is just hacky syntax suggar.
 
 ### API
-The framework provides (though `test.h`) a set of functions and macros for you to write your tests.
+The framework provides (through `test.h`) a set of functions and macros for you to write your tests.
 The file `test.h` has a naming convention in which identifiers prefixed with underscore (`_`) are meant to be private and used only inside the header itself.
 All other public macros and functions are designed to be used by the end user when writing tests.
 The available public API is:
@@ -91,14 +92,14 @@ struct TestEnvironment
 
 // A function for setting up the test environment before execution.
 // May be useful to instatiate helper data that will be used in multiple tests, for example.
-void (*setupFunction)(_TestEnvironment* env) = _ignore;
+void (*setupFunction)(TestEnvironment* env) = _ignore;
 // A function for cleaning up the things done in the setupFunction step.
-void (*cleanFunction)(_TestEnvironment* env) = _ignore;
+void (*cleanFunction)(TestEnvironment* env) = _ignore;
 // Function to be called when a test fail. If changed make sure the new fuction calls `_defaultFailure`.
 // May be useful to write to a file or doing some extra processing.
-void (*onFail)(_TestEnvironment* env, int line, char* expr) = _defaultFailure;
+void (*onFail)(TestEnvironment* env, int line, char* expr) = _defaultFailure;
 // Function to be called when a test pass. If changed make sure the new fuction calls `_defaultTestPass`.
-void (*onTestPass)(_TestEnvironment* env) = _defaultTestPass;
+void (*onTestPass)(TestEnvironment* env) = _defaultTestPass;
 // Function to be called when a raise occurs
 void (*onRaise)(int) = (void*)_ignore;
 
@@ -122,7 +123,7 @@ int runAllTests(int numArgs, char** args);
 
 ### Tests runner
 The test runner is a bootstrap executable that is responsible for running all other tests and making sense of their results.
-For standards it is adviced to be the `tests/test.c` and it should look something like:
+For standards it is recommended to be the `tests/test.c` file and it should look something like:
 
 ```C
 #include "test.h"
@@ -133,7 +134,7 @@ int main(int numArgs, char** args)
 }
 ```
 
-You can always change it for adding the functionalities your project require.
+You can always change it for adding pre/post tests processing or any other functionality your project requires.
 
 ### Runner parameters
 
@@ -147,12 +148,15 @@ PARTIAL_PATH:LINE_NUMBER         # Same as --module PARTIAL_PATH --line LINE_NUM
 ```
 
 ## Building and running this repo
+This repo was designed to be a simple yet complete showcase of the framework.
+It implements a `libExample` for being used as subject of the tests.
+
 ### Dependencies
 - make
 - gcc
 - git
 
-Run the following commands for build and runnning the tests:
+Run the following commands for building and runnning the tests:
 ```bash
 # Downloads the project
 git clone https://github.com/ClaudioMota/BugTestsRocket.git
@@ -186,53 +190,36 @@ context("A")
     assert(true);
   }
 
+  context("B")
+  {
+    test("test 2")
+    {
+      assert(true);
+    }
+  }
+
   test("test 3")
   {
     refute(false);
   }
 }
 
-context("B")
-{
-  test("test 2")
-  {
-    assert(true);
-  }
-}
 🚀
 ```
-Has the same test semmantic of:
+Has the same test semantic of:
 ```C
 #include "test.h"
 
 🐛
 context("A")
-{
   test("test 1")
     assert(true);
-
-  test("test 3")
-    refute(false);
-
-  context("B")
-    test("test 2")
-      assert(true);
-}
-🚀
-```
-Or even:
-```C
-#include "test.h"
-
-🐛
-context("A")
-test("test 1")
-assert(true);
-test("test 3")
-refute(false);
 context("B")
-test("test 2")
-assert(true);
+  test("test 2")
+    refute(false);
+  test("test 3")
+    assert(true);
 🚀
 ```
-So be aware of the structure of your tests code, and write it in a way that is suitable for you.
+So `test 3` is part of context `B` despite the scope looking something different.
+So be aware of the structure of your tests, and write it in a way that is suitable for you.
