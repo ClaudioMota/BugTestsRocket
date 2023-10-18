@@ -22,6 +22,7 @@ jobs:
         id: test
         continue-on-error: true
         run: |
+          echo "result=$?banana" >> "motherfucker"
           build/tests/test
           echo "result=$?banana" >> "$GITHUB_OUTPUT"
 
