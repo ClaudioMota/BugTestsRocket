@@ -27,6 +27,6 @@ jobs:
 
       - name: Check test result
         run: |
-          if [ ${{steps.test.outputs.exit_code}} != 1 ]; then
+          if [ "${{ steps.test.outputs.exit_code }}" != 1 ]; then
             exit 1
           fi
