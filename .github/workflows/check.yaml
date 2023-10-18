@@ -23,7 +23,7 @@ jobs:
         continue-on-error: true
         run: |
           build/tests/test
-          exit_code=$?
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
 
       - name: Check test result
         run: |
