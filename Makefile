@@ -7,10 +7,10 @@ C_OBJECTS=$(foreach x, $(basename $(C_SOURCES)), build/$(x).o)
 C_TEST_OBJECTS=$(foreach x, $(basename $(C_TEST_SOURCES)), build/$(x))
 
 # Builds the example library
-lib: build/libExample.a
+build_all: build/libExample.a $(C_TEST_OBJECTS)
 
 # Builds and runs the tests
-test: build/libExample.a $(C_TEST_OBJECTS)
+test: build_all
 	build/tests/test
 
 build/libExample.a: prepare $(C_OBJECTS)
