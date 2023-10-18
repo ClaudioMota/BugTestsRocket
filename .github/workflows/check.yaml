@@ -24,7 +24,6 @@ jobs:
         run: |
           build/tests/test
           echo "::set-output name=exit_code::$?"
-          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
 
       - name: Check test result
         run: |
