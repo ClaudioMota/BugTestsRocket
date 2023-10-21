@@ -20,15 +20,19 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+// See https://github.com/ClaudioMota/BugTestsRocket/ for updated versions
+// If this file is incomplete try running _internal/mergeHeaders.sh before copying
+
 #ifndef TEST_HEADER
 #define TEST_HEADER 1
 
+#include <stdio.h>
+#include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
-#include <signal.h>
 #include <ctype.h>
+#include <signal.h>
 
 #define 🐛 beginTests
 #define 🚀 endTests
@@ -61,11 +65,513 @@
     _sourceFile = __FILE__;\
     return _testFileMain(numArgs, args, _allTests);\
   }
+  // This content is part of test.h
+// Static libraries management
 
-typedef struct _TestSelect _TestSelect;
-typedef struct TestEnvironment TestEnvironment;
+typedef struct _StaticLib _StaticLib;
+typedef struct _GlobalSymbol _GlobalSymbol;
+typedef struct _StaticLibFile _StaticLibFile;
+typedef struct _StaticLibHeader _StaticLibHeader;
+
+struct _GlobalSymbol
+{
+  char name[256];
+  int fileOffset;
+  int fileIndex;
+};
+
+struct _StaticLibFile
+{
+  char fileInfo[60];
+  char* content;
+  long long contentSize;
+};
+
+struct _StaticLibHeader
+{
+  char sig[8];
+  char name[16];
+  char date[12];
+  char uid[6];
+  char gid[6];
+  char mode[8];
+  char size[10];
+  char end[2];
+
+  int globalSymbolCount;
+};
+
+struct _StaticLib
+{
+  _StaticLibHeader header;
+  _GlobalSymbol* globalSymbols;
+  int fileCount;
+  _StaticLibFile* files;
+};
+
+bool _staticLibAmILittleEndian()
+{
+  int a = 1;
+  return ((char*)&a)[0] == 1;
+}
+
+unsigned int _staticLibSwapBytes(unsigned int number)
+{
+  return ((number & 0x000000FF) << 24) |
+          ((number & 0x0000FF00) << 8) |
+          ((number & 0x00FF0000) >> 8) |
+          ((number & 0xFF000000) >> 24);
+}
+
+void _staticLibSwapIfLittleEndian(int* bigEndian)
+{
+  if(_staticLibAmILittleEndian())
+    *bigEndian = _staticLibSwapBytes(*bigEndian);
+}
+
+bool _staticLibRead(_StaticLib* out, char* path)
+{
+  memset(out, 0, sizeof(_StaticLib));
+  FILE *file = fopen(path, "rb");
+  if(!file) return false;
+  
+  bool ok = true;
+  fseek(file, 0, SEEK_SET);
+  ok = fread(out, sizeof(_StaticLibHeader), 1, file) == 1;
+  ok = ok && memcmp(out->header.sig, "!<arch>\n", 6) == 0;
+
+  if(ok)
+  {
+    _staticLibSwapIfLittleEndian(&out->header.globalSymbolCount);
+    int size = sizeof(_GlobalSymbol)*out->header.globalSymbolCount;
+
+    out->globalSymbols = malloc(size);
+    memset(out->globalSymbols, 0, size);
+
+    for(int i = 0; i < out->header.globalSymbolCount; i++)
+    {
+      _GlobalSymbol* symbol = &out->globalSymbols[i];
+      fread(&symbol->fileOffset, sizeof(int), 1, file);
+      _staticLibSwapIfLittleEndian(&symbol->fileOffset);
+    }
+
+    for(int i = 0; i < out->header.globalSymbolCount; i++)
+    {
+      char* name = out->globalSymbols[i].name;
+      int c;
+      while((c = fgetc(file))) *(name++) = c;
+    }
+
+    int c;
+    while((c = getc(file)) != EOF)
+    {
+      ungetc(c, file);
+      int i = out->fileCount++;
+      out->files = realloc(out->files, sizeof(_StaticLibFile)*out->fileCount);
+      _StaticLibFile* libFile = &out->files[i];
+      memset(libFile, 0, sizeof(_StaticLibFile));
+      fread(libFile->fileInfo, sizeof(libFile->fileInfo), 1, file);
+      libFile->contentSize = atoi(&libFile->fileInfo[48]);
+      libFile->content = malloc(libFile->contentSize);
+      ok = fread(libFile->content, libFile->contentSize, 1, file) == 1;
+    }
+  }
+
+  fclose(file);
+
+  return ok;
+}
+
+bool _staticLibWrite(_StaticLib* lib, char* path)
+{
+  FILE *file = fopen(path, "wb");
+  if(!file) return false;
+  
+  char auxNum[32];
+  int globalSymbolCount = lib->header.globalSymbolCount;
+  unsigned int size = sizeof(int)*(globalSymbolCount+1);
+  for(int i = 0; i < globalSymbolCount; i++)
+    size += strlen(lib->globalSymbols[i].name) + 1;
+
+  _StaticLibHeader header = lib->header;
+  memset(header.size, ' ', sizeof(header.size));
+  sprintf(auxNum, "%u", size);
+  memcpy(header.size, auxNum, strlen(auxNum));
+  
+  fseek(file, 0, SEEK_SET);
+  _staticLibSwapIfLittleEndian(&header.globalSymbolCount);
+  fwrite(&header, sizeof(_StaticLibHeader), 1, file);
+  
+  for(int i = 0; i < globalSymbolCount; i++)
+  {
+    _GlobalSymbol symbol = lib->globalSymbols[i];
+    _staticLibSwapIfLittleEndian(&symbol.fileOffset);
+    fwrite(&symbol.fileOffset, sizeof(int), 1, file);
+  }
+
+  for(int i = 0; i < globalSymbolCount; i++)
+    fwrite(lib->globalSymbols[i].name, strlen(lib->globalSymbols[i].name) + 1, 1, file);
+
+  for(int i = 0; i < lib->fileCount; i++)
+  {
+    char fileInfo[60];
+    _StaticLibFile* libFile = &lib->files[i];
+    memcpy(fileInfo, libFile->fileInfo, sizeof(fileInfo));
+    memset(fileInfo + 48, ' ', 10);
+    sprintf(auxNum, "%lli", libFile->contentSize);
+    memcpy(fileInfo + 48, auxNum, strlen(auxNum));
+    fwrite(fileInfo, sizeof(libFile->fileInfo), 1, file);
+    fwrite(libFile->content, libFile->contentSize, 1, file);
+  }
+
+  fclose(file);
+
+  return true;
+}
+
+void _staticLibFree(_StaticLib* lib)
+{
+  for(int i = 0; i < lib->fileCount; i++)
+    if(lib->files[i].content) free(lib->files[i].content);
+  if(lib->files) free(lib->files);
+  if(lib->globalSymbols) free(lib->globalSymbols);
+}
+// This content is part of test.h
+// Object files and symbol management
+
+typedef struct _ElfRel _ElfRel;
+typedef struct _ElfRela _ElfRela;
+typedef struct _ElfHeader _ElfHeader;
+typedef struct _ElfSectionHeader _ElfSectionHeader;
+typedef struct _ElfSymbol _ElfSymbol;
+
+struct _ElfRel
+{
+  uint64_t r_offset;
+  uint64_t r_info;
+};
+
+struct _ElfRela
+{
+  uint64_t r_offset;
+  uint64_t r_info;
+  int64_t r_addend;
+}; 
+
+struct _ElfHeader
+{
+  unsigned char e_ident[16];
+  uint16_t e_type;
+  uint16_t e_machine;
+  uint32_t e_version;
+  uint64_t e_entry;
+  uint64_t e_phoff;
+  uint64_t e_shoff;
+  uint32_t e_flags;
+  uint16_t e_ehsize;
+  uint16_t e_phentsize;
+  uint16_t e_phnum;
+  uint16_t e_shentsize;
+  uint16_t e_shnum;
+  uint16_t e_shstrndx;
+};
+
+struct _ElfSectionHeader
+{
+  uint32_t sh_name;
+  uint32_t sh_type;
+  uint64_t sh_flags;
+  uint64_t sh_addr;
+  uint64_t sh_offset;
+  uint64_t sh_size;
+  uint32_t sh_link;
+  uint32_t sh_info;
+  uint64_t sh_addralign;
+  uint64_t sh_entsize;
+};
+
+struct _ElfSymbol
+{
+  uint32_t st_name;
+  uint8_t st_info;
+  uint8_t st_other;
+  uint16_t st_shndx;
+  uint64_t st_value;
+  uint64_t st_size;
+};
+
+bool _objectFileIsSupportedElf64(_ElfHeader* header)
+{
+  if(header->e_ident[0] == 0x7f && header->e_ident[1] == 'E' && header->e_ident[2] == 'L' && header->e_ident[3] == 'F' && header->e_ident[4] == 2 &&
+     header->e_type == 1 && header->e_ident[7] == 0 && header->e_entry == 0 && header->e_phoff == 0 && header->e_phentsize == 0 && header->e_phnum == 0 &&
+     header->e_shentsize == sizeof(_ElfSectionHeader)
+    )
+    return true;
+  
+  
+  return false;
+}
+
+char* _objectFileElfGetString(_StaticLibFile* libFile, _ElfSectionHeader* stringHeader, int nameIndex)
+{  
+  return &libFile->content[stringHeader->sh_offset + nameIndex];
+}
+
+_ElfSymbol* _objectFileElfGetSymbol(_StaticLibFile* libFile, _ElfSectionHeader* symTable, int index)
+{
+  return (void*)&libFile->content[symTable->sh_offset + sizeof(_ElfSymbol)*index];
+}
+
+bool _objectFileElfIsGlobalFunctionDefinedHere(_ElfSymbol* symbol)
+{
+  int binding = (symbol->st_info >> 4) & 0xF; // 0 is local
+  int type = symbol->st_info & 0xF; // 2 is function
+  return binding != 0 && type == 2 && symbol->st_value != 0;
+}
+
+void _objectFileMockElfSymbol(_StaticLibFile* libFile, _ElfHeader header, _ElfSectionHeader* sections, _ElfSectionHeader* symbolTable, _ElfSymbol* symbol, char* to)
+{
+  int offset = sizeof(_ElfHeader), addedBytes = 0;
+  char* newContent = malloc(libFile->contentSize*2);
+  memset(newContent, 0, libFile->contentSize*2);
+  _ElfSectionHeader* stringTable = &sections[symbolTable->sh_link];
+  _ElfSectionHeader* orderedSections[header.e_shnum];
+  memset(orderedSections, 0, sizeof(orderedSections));
+  int lastMin = -1;
+  int lastIndex = -1;
+  for(int i = 0; i < header.e_shnum; i++)
+  {
+    int minIndex;
+    for(int j = 0; j < header.e_shnum; j++)
+    {
+      int off = sections[j].sh_offset;
+    
+      if(off < lastMin || (off == lastMin && j <= lastIndex)) continue;
+      if(!orderedSections[i] || off < orderedSections[i]->sh_offset)
+      {
+        minIndex = j;
+        orderedSections[i] = &sections[j];
+      }
+    }
+
+    lastIndex = minIndex;
+    lastMin = orderedSections[i]->sh_offset;
+  }
+
+  _ElfSymbol aux = *symbol;
+  _ElfSymbol* newSymbol = &aux;
+  symbol->st_value = 0;
+  symbol->st_size = 0;
+  symbol->st_shndx = 0;
+  symbol->st_info &= 0xF0;
+
+  for(int i = 0; i < header.e_shnum; i++)
+  {
+    _ElfSectionHeader* current = orderedSections[i];
+    if(current->sh_addralign > 1 && offset % current->sh_addralign)
+      offset += current->sh_addralign - (offset % current->sh_addralign);
+    memcpy(newContent + offset, libFile->content + current->sh_offset, current->sh_size);
+    current->sh_offset = offset;
+    offset += current->sh_size;
+    
+    if(current == stringTable)
+    {
+      int size = strlen(to) + 1;
+      newSymbol->st_name = offset-current->sh_offset;
+      memcpy(newContent + offset, to, size);
+      offset += size;
+      addedBytes += size;
+      current->sh_size += size;
+    }
+    else if(current == symbolTable)
+    {
+      int size = sizeof(_ElfSymbol);
+      memcpy(newContent + offset, newSymbol, size);
+      newSymbol = (void*)(newContent + offset);
+      offset += size;
+      addedBytes += size;
+      current->sh_size += size;
+    }
+  }
+
+  if(offset % 8) offset += 8 - (offset % 8);
+
+  header.e_shoff = offset;
+  for(int i = 0; i < header.e_shnum; i++)
+  {
+    memcpy(newContent + offset, &sections[i], sizeof(_ElfSectionHeader));
+    offset += sizeof(_ElfSectionHeader);
+  }
+
+  memcpy(newContent, &header, sizeof(_ElfHeader));
+  free(libFile->content);
+  libFile->contentSize = offset;
+  libFile->content = newContent;
+}
+
+bool _objectFileMockElfFunction(_StaticLibFile* libFile, _ElfHeader header, char* from, char* to)
+{
+  _ElfSectionHeader sections[header.e_shnum];
+
+  for(int i = 0; i < header.e_shnum; i++)
+    memcpy(&sections[i], libFile->content + header.e_shoff + sizeof(_ElfSectionHeader)*i, sizeof(_ElfSectionHeader));
+
+  _ElfSectionHeader* symbolTable = 0;
+  for(int i = 0; i < header.e_shnum; i++)
+    if(sections[i].sh_type == 2) symbolTable = &sections[i];
+  
+  if(!symbolTable) return true;
+  for(int i = 1; i < symbolTable->sh_size/sizeof(_ElfSymbol); i++)
+  {
+    _ElfSymbol* symbol = _objectFileElfGetSymbol(libFile, symbolTable, i);
+    char* name = _objectFileElfGetString(libFile, &sections[symbolTable->sh_link], symbol->st_name);
+    if(name && strcmp(name, from) == 0 && _objectFileElfIsGlobalFunctionDefinedHere(symbol))
+    {
+      _objectFileMockElfSymbol(libFile, header, sections, symbolTable, symbol, to);
+      break;
+    }
+  }
+  
+  return true;
+}
+
+bool _objectFileMockFunction(_StaticLibFile* libFile, char* from, char* to)
+{
+  _ElfHeader elfHeader;
+  memcpy(&elfHeader, libFile->content, sizeof(_ElfHeader));
+  if(_objectFileIsSupportedElf64(&elfHeader))
+    return _objectFileMockElfFunction(libFile, elfHeader, from, to);
+
+  printf("Lib not supported. Must be a ELF64 relocatable lib. Try adding --fPIC to your compiler flags.\n");
+  return false;
+}
+// This content is part of test.h
+// Mock functionalities
+
 typedef struct FunctionMock FunctionMock;
 typedef struct FunctionDescriptor FunctionDescriptor;
+
+struct FunctionMock
+{
+  bool set;
+  char name[256];
+  void* mockPointer;
+};
+
+struct FunctionDescriptor
+{
+  char returnType[32];
+  char name[256];
+  char args[256];
+};
+
+int _writeArgs(FILE* file, char* args)
+{
+  int argsCount = 0;
+  int argsSize = strlen(args);
+  char arg[argsSize + 1];
+  int a = 0;
+  for(int i = 0; i <= argsSize; i++)
+  {
+    if(!isspace(args[i]) || !args[i])
+    {
+      if(args[i] == '\0' || args[i] == ',')
+      {
+        if(a > 0)
+        {
+          arg[a] = '\0';
+          if(argsCount > 0) fprintf(file, ",");
+          fprintf(file, "%s a%i", arg, argsCount++);
+        }
+        a = 0;
+      }
+      else
+        arg[a++] = args[i];
+    }
+  }
+  return argsCount;
+}
+
+void _getMockedName(char* output, char* functioName)
+{
+  strcpy(output, "🐛");
+  strcat(output, functioName);
+  strcat(output, "🚀");
+}
+
+bool _createMockFile(char* mockFilePath, int functionCount, FunctionDescriptor* functions)
+{
+  FILE* file = fopen(mockFilePath, "wb");
+  if(!file) return false;
+
+  fprintf(file, "#include <stdbool.h>\n"); 
+  fprintf(file, "typedef struct FunctionMock{ bool set; char name[256]; void* mockPointer; } FunctionMock;\n");
+
+  for(int i = 0; i < functionCount; i++)
+  {
+    char mockedName[256];
+    _getMockedName(mockedName, functions[i].name);
+    fprintf(file, "%s %s(%s);\n", functions[i].returnType, mockedName, functions[i].args);
+    fprintf(file, "%s (*_mocked_%s)(%s) = %s;\n", functions[i].returnType, functions[i].name, functions[i].args, mockedName);
+  }
+  for(int i = 0; i < functionCount; i++)
+  {
+    fprintf(file, "%s %s(", functions[i].returnType, functions[i].name);
+    int argsCount = _writeArgs(file, functions[i].args);
+    fprintf(file, "){ return _mocked_%s(", functions[i].name);
+    for(int a = 0; a < argsCount; a++)
+      if(a)
+        fprintf(file, ", a%i", a);
+      else
+        fprintf(file, "a%i", a);
+    fprintf(file, "); }\n");
+  }
+  fprintf(file, "FunctionMock _mocks[] = {\n");
+  for(int i = 0; i < functionCount; i++)
+  {
+    fprintf(file, "  {true, \"%s\", &_mocked_%s},\n", functions[i].name, functions[i].name);
+  }
+  fprintf(file, "  {false, \"\", 0}\n};\n");
+
+  fclose(file);
+  return true;
+}
+
+bool createMocks(char* libPath, char* mockableLibPath, char* mockFilePath, int functionCount, FunctionDescriptor* functions)
+{
+  bool ret = true;
+ 
+  _StaticLib lib;
+
+  if(_staticLibRead(&lib, libPath))
+  {
+    for(int f = 0; f < functionCount; f++)
+    {
+      char mockedName[strlen(functions[f].name)+64];
+      _getMockedName(mockedName, functions[f].name);
+    
+      for(int i = 0; i < lib.header.globalSymbolCount; i++)
+        if(strcmp(lib.globalSymbols[i].name, functions[f].name) == 0)
+          strcpy(lib.globalSymbols[i].name, mockedName);
+    
+      for(int i = 0; i < lib.fileCount; i++)
+        _objectFileMockFunction(&lib.files[i], functions[f].name, mockedName);
+    }
+    
+    ret = _staticLibWrite(&lib, mockableLibPath);
+    ret &= _createMockFile(mockFilePath, functionCount, functions);
+  }
+  else
+    ret = false;
+
+  _staticLibFree(&lib);
+
+  return ret;
+}
+// This content is part of test.h
+// Main testing functionalities
+typedef struct _TestSelect _TestSelect;
+typedef struct TestEnvironment TestEnvironment;
 
 enum _TestSelectMode
 {
@@ -80,20 +586,6 @@ struct _TestSelect
   int mode;
   int index, line;
   char* name;
-};
-
-struct FunctionMock
-{
-  bool set;
-  char name[32];
-  void* mockPointer;
-};
-
-struct FunctionDescriptor
-{
-  char returnType[32];
-  char name[32];
-  char args[256];
 };
 
 struct TestEnvironment
@@ -272,6 +764,26 @@ int _doRunTest(char* testProgram)
   return WEXITSTATUS(status);
 }
 
+void _mock(char* functionName, void* function, FunctionMock* mocks)
+{
+  void** mockPointer = 0;
+  for(int i = 0; i < mocks[i].set; i++)
+  {
+    if(strcmp(mocks[i].name, functionName) == 0)
+    {
+      mockPointer = mocks[i].mockPointer;
+      break;
+    }
+  }
+
+  char message[256];
+  strcpy(message, "Could not mock function ");
+  strcat(message, functionName);
+  if(!mockPointer) onFail(_currentEnv, _currentEnv->testLine, message);
+
+  *mockPointer = function;
+}
+
 // Allocates and sets to output a list with all test files in the directory and subdirectories of the test runner
 // Returns the count of files
 bool _isDirectory(char* file);
@@ -401,222 +913,8 @@ int _testFileMain(int numArgs, char** args, int (*_allTests)(TestEnvironment*))
   _freeArgsCopy();
   return _testCount;
 }
-
-// Mocks
-void _mock(char* functionName, void* function, FunctionMock* mocks)
-{
-  void** mockPointer = 0;
-  for(int i = 0; i < mocks[i].set; i++)
-  {
-    if(strcmp(mocks[i].name, functionName) == 0)
-    {
-      mockPointer = mocks[i].mockPointer;
-      break;
-    }
-  }
-
-  char message[256];
-  strcpy(message, "Could not mock function ");
-  strcat(message, functionName);
-  if(!mockPointer) onFail(_currentEnv, _currentEnv->testLine, message);
-
-  *mockPointer = function;
-}
-
-int _readFile(char* path, char** output)
-{
-  *output = 0;
-  FILE* file = fopen(path, "rb");
-  if(!file) return 0;
-
-  int capacity = 2000, size = 0;
-  *output = malloc(capacity);
-  char* buffer = *output;
-  int readSize = 0;
-
-  while((readSize = fread(buffer, 1, capacity - size, file)))
-  {
-    if(readSize + size >= capacity)
-    {
-      capacity *= 2;
-      *output = realloc(*output, capacity);
-    }
-
-    size += readSize;
-    buffer = *output + size;
-  }
-
-  fclose(file);
-
-  return size;
-}
-
-bool _writeFile(char* path, char* fileContent, int fileSize)
-{
-  FILE* file = fopen(path, "wb");
-  if(!file) return false;
-
-  bool ret = fwrite(fileContent, 1, fileSize, file) == fileSize;
-
-  fclose(file);
-
-  return ret;
-}
-
-char* _findSymbol(char* fileContent, int fileSize, char* symbol)
-{
-  int symbolLength = strlen(symbol);
-  for(int i = 0; i < fileSize; i++)
-  {
-    bool missed = false;
-    for(int j = 0; j <= symbolLength && i + j <= fileSize; j++)
-      if(fileContent[i+j] != symbol[j]) missed = true;
-    if(!missed) return fileContent + i;
-  }
-  return 0;
-}
-
-int bR000000000000()
-{
-  return 3423414;
-}
-
-int _replaceAllSymbols(char* fileContent, int fileSize, char* symbol, char* replacement)
-{
-  int symbolLength = strlen(symbol);
-  int ocurrences = 0;
-  char* auxPointer = fileContent;
-
-  while((auxPointer = _findSymbol(auxPointer, fileSize, symbol)))
-  {
-    //if(ocurrences == 0)
-      //memcpy(auxPointer, replacement, symbolLength);
-    auxPointer++;
-    ocurrences++;
-  }
-
-  return ocurrences;
-}
-
-void _makeMockable(char* fileContent, int fileSize, FILE* mocksFile, FunctionDescriptor function, int index)
-{
-  char* prefix = "bR";
-  int minNameLength = strlen(prefix);
-
-  if(strlen(function.name) <= minNameLength)
-  {
-    printf("Could not make function %s mockable: the function name must be bigger than %i\n", function.name, minNameLength);
-    return;
-  }
-
-  int maxNameLength = strlen(function.name);
-  char indexStr[32];
-  char replacement[maxNameLength+1];
-  memset(indexStr, 0, sizeof(indexStr));
-  memset(replacement, '0', strlen(function.name));
-  memcpy(replacement, prefix, minNameLength);
-
-  replacement[strlen(function.name)] = '\0';
-  sprintf(indexStr, "%x", index);
-
-  if(strlen(indexStr) + minNameLength > maxNameLength)
-  {
-    printf("Could not make function %s mockable: mocked name is bigger than function name (%s%x)\n", function.name, prefix, index);
-    return;
-  }
-
-  memcpy(replacement + minNameLength, indexStr, strlen(indexStr));
-  
-  int count = _replaceAllSymbols(fileContent, fileSize, function.name, replacement);
-  printf("->%i\n", count);
-
-  fprintf(mocksFile, "%s %s(%s);\n", function.returnType, replacement, function.args);
-  fprintf(mocksFile, "%s (*_mocked_%s)(%s) = %s;\n", function.returnType, function.name, function.args, replacement);
-}
-
-int _writeArgs(FILE* file, char* args)
-{
-  int argsCount = 0;
-  int argsSize = strlen(args);
-  char arg[argsSize + 1];
-  int a = 0;
-  for(int i = 0; i <= argsSize; i++)
-  {
-    if(!isspace(args[i]) || !args[i])
-    {
-      if(args[i] == '\0' || args[i] == ',')
-      {
-        if(a > 0)
-        {
-          arg[a] = '\0';
-          if(argsCount > 0) fprintf(file, ",");
-          fprintf(file, "%s a%i", arg, argsCount++);
-        }
-        a = 0;
-      }
-      else
-        arg[a++] = args[i];
-    }
-  }
-  return argsCount;
-}
-
-bool _makeMockables(char* libPath, char* mockFilePath, int functionCount, FunctionDescriptor* functions)
-{
-  bool ret = true;
-  char* fileContent;
-  int fileSize = _readFile(libPath, &fileContent);
-
-  if(!fileContent)
-  {
-    printf("could not open file %s\n", libPath);
-    return false;
-  }
-
-  FILE* mockFile = fopen(mockFilePath, "wb");
-  if(mockFile) 
-  {
-    fprintf(mockFile, "#include <stdbool.h>\n"); 
-    fprintf(mockFile, "typedef struct FunctionMock{ bool set; char name[32]; void* mockPointer; } FunctionMock;\n");
-    for(int i = 0; i < functionCount; i++)
-      _makeMockable(fileContent, fileSize, mockFile, functions[i], i);
-    for(int i = 0; i < functionCount; i++)
-    {
-      fprintf(mockFile, "%s %s(", functions[i].returnType, functions[i].name);
-      int argsCount = _writeArgs(mockFile, functions[i].args);
-      fprintf(mockFile, "){ return _mocked_%s(", functions[i].name);
-      for(int a = 0; a < argsCount; a++)
-        if(a)
-          fprintf(mockFile, ", a%i", a);
-        else
-          fprintf(mockFile, "a%i", a);
-      fprintf(mockFile, "); }\n");
-    }
-    fprintf(mockFile, "FunctionMock _mocks[] = {\n");
-    for(int i = 0; i < functionCount; i++)
-    {
-      fprintf(mockFile, "  {true, \"%s\", &_mocked_%s},\n", functions[i].name, functions[i].name);
-    }
-    fprintf(mockFile, "  {false, \"\", 0}\n};\n");
-
-    fclose(mockFile);
-
-    if(!_writeFile(libPath, fileContent, fileSize))
-    {
-      printf("Failed to write mocks to lib %s\n", libPath);
-      ret = false;
-    }
-  }
-  else
-  {
-    printf("Could not write to mocks file %s\n", mockFilePath);
-    return false;
-  }
-
-  free(fileContent);
-
-  return ret;
-}
+// This content is part of test.h
+// Platform specific functions
 
 #ifdef _WIN32
 #include <windows.h>
@@ -705,4 +1003,5 @@ int _listFiles(char* path, char** output)
   return fileCount;
 }
 #endif
+// Ends test.h
 #endif

@@ -6,6 +6,12 @@ int main(int, char**)
     {"int", "getRandomInput", ""}
   };
 
-  _makeMockables("build/libExample.a", "build/mocks.c", sizeof(functions)/sizeof(FunctionDescriptor), functions);
+  createMocks(
+    "build/libExample.a",
+    "build/libExampleTest.a",
+    "build/mocks.c",
+    sizeof(functions)/sizeof(FunctionDescriptor), functions
+  );
+  
   return 0;
 }
