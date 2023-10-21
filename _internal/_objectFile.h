@@ -1,4 +1,6 @@
-// This file must be included through test.h only
+// This content is part of test.h
+// Object files and symbol management
+
 typedef struct _ElfRel _ElfRel;
 typedef struct _ElfRela _ElfRela;
 typedef struct _ElfHeader _ElfHeader;
@@ -106,7 +108,7 @@ void _objectFileMockElfSymbol(_StaticLibFile* libFile, _ElfHeader header, _ElfSe
     {
       int off = sections[j].sh_offset;
     
-      if(off < lastMin || off == lastMin && j <= lastIndex) continue;
+      if(off < lastMin || (off == lastMin && j <= lastIndex)) continue;
       if(!orderedSections[i] || off < orderedSections[i]->sh_offset)
       {
         minIndex = j;
@@ -125,7 +127,6 @@ void _objectFileMockElfSymbol(_StaticLibFile* libFile, _ElfHeader header, _ElfSe
   symbol->st_shndx = 0;
   symbol->st_info &= 0xF0;
 
-  int64_t* fdp;
   for(int i = 0; i < header.e_shnum; i++)
   {
     _ElfSectionHeader* current = orderedSections[i];
