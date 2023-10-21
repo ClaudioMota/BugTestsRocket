@@ -1,8 +1,9 @@
 // This file must be included through test.h only
 #include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
 
 typedef struct _StaticLib _StaticLib;
 typedef struct _GlobalSymbol _GlobalSymbol;
