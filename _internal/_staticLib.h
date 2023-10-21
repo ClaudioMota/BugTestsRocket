@@ -84,6 +84,7 @@ bool _staticLibRead(_StaticLib* out, char* path)
     for(int i = 0; i < out->header.globalSymbolCount; i++)
     {
       _GlobalSymbol* symbol = &out->globalSymbols[i];
+      symbol->fileIndex = 0;
       fread(&symbol->fileOffset, sizeof(int), 1, file);
       _staticLibSwapIfLittleEndian(&symbol->fileOffset);
     }
@@ -92,13 +93,16 @@ bool _staticLibRead(_StaticLib* out, char* path)
     {
       char* name = out->globalSymbols[i].name;
       int c;
-      while(c = fgetc(file)) *(name++) = c;
+      while((c = fgetc(file))) *(name++) = c;
     }
 
     int c;
     while((c = getc(file)) != EOF)
     {
       ungetc(c, file);
+      for(int i = 0; i < out->header.globalSymbolCount; i++)
+        if(out->globalSymbols[i].fileOffset == ftell(file))
+          out->globalSymbols[i].fileIndex = out->fileCount;
       int i = out->fileCount++;
       out->files = realloc(out->files, sizeof(_StaticLibFile)*out->fileCount);
       _StaticLibFile* libFile = &out->files[i];
@@ -138,6 +142,9 @@ bool _staticLibWrite(_StaticLib* lib, char* path)
   for(int i = 0; i < globalSymbolCount; i++)
   {
     _GlobalSymbol symbol = lib->globalSymbols[i];
+    symbol.fileOffset = sizeof(_StaticLibHeader) - sizeof(int) + size + symbol.fileIndex*60;
+    for(int j = 0; j < symbol.fileIndex; j++)
+      symbol.fileOffset += lib->files[j].contentSize;
     _staticLibSwapIfLittleEndian(&symbol.fileOffset);
     fwrite(&symbol.fileOffset, sizeof(int), 1, file);
   }

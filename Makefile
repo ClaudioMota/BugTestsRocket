@@ -1,5 +1,5 @@
 CC=gcc
-C_FLAGS=-Wall -fPIC -Wl,--allow-multiple-definition
+C_FLAGS=-Wall -fPIC
 INCLUDE_PATH= -Iexample
 C_SOURCES=$(shell find example/ -type f -iname "*.c")
 C_TEST_SOURCES=$(shell find tests/ -type f -iname "*.c")

@@ -108,7 +108,7 @@ void _objectFileMockElfSymbol(_StaticLibFile* libFile, _ElfHeader header, _ElfSe
     {
       int off = sections[j].sh_offset;
     
-      if(off < lastMin || off == lastMin && j <= lastIndex) continue;
+      if(off < lastMin || (off == lastMin && j <= lastIndex)) continue;
       if(!orderedSections[i] || off < orderedSections[i]->sh_offset)
       {
         minIndex = j;
