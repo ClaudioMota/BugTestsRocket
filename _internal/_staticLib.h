@@ -65,10 +65,10 @@ void _staticLibSwapIfLittleEndian(int* bigEndian)
     *bigEndian = _staticLibSwapBytes(*bigEndian);
 }
 
-bool _staticLibRead(_StaticLib* out, char* fileName)
+bool _staticLibRead(_StaticLib* out, char* path)
 {
   memset(out, 0, sizeof(_StaticLib));
-  FILE *file = fopen(fileName, "rb");
+  FILE *file = fopen(path, "rb");
   if(!file) return false;
   
   bool ok = true;
@@ -110,13 +110,59 @@ bool _staticLibRead(_StaticLib* out, char* fileName)
       libFile->contentSize = atoi(&libFile->fileInfo[48]);
       libFile->content = malloc(libFile->contentSize);
       ok = fread(libFile->content, libFile->contentSize, 1, file) == 1;
-      printf("%48s %lli\n", libFile->fileInfo, libFile->contentSize);
     }
   }
 
   fclose(file);
 
   return ok;
+}
+
+bool _staticLibWrite(_StaticLib* lib, char* path)
+{
+  FILE *file = fopen(path, "wb");
+  if(!file) return false;
+  
+  char auxNum[32];
+  int globalSymbolCount = lib->header.globalSymbolCount;
+  unsigned int size = sizeof(int)*(globalSymbolCount+1);
+  for(int i = 0; i < globalSymbolCount; i++)
+    size += strlen(lib->globalSymbols[i].name) + 1;
+
+  _StaticLibHeader header = lib->header;
+  memset(header.size, ' ', sizeof(header.size));
+  sprintf(auxNum, "%u", size);
+  memcpy(header.size, auxNum, strlen(auxNum));
+  
+  fseek(file, 0, SEEK_SET);
+  _staticLibSwapIfLittleEndian(&header.globalSymbolCount);
+  fwrite(&header, sizeof(_StaticLibHeader), 1, file);
+  
+  for(int i = 0; i < globalSymbolCount; i++)
+  {
+    _GlobalSymbol symbol = lib->globalSymbols[i];
+    _staticLibSwapIfLittleEndian(&symbol.fileOffset);
+    fwrite(&symbol.fileOffset, sizeof(int), 1, file);
+  }
+
+  for(int i = 0; i < globalSymbolCount; i++)
+    fwrite(lib->globalSymbols[i].name, strlen(lib->globalSymbols[i].name) + 1, 1, file);
+
+  for(int i = 0; i < lib->fileCount; i++)
+  {
+    char fileInfo[60];
+    _StaticLibFile* libFile = &lib->files[i];
+    memcpy(fileInfo, libFile->fileInfo, sizeof(fileInfo));
+    memset(fileInfo + 48, ' ', 10);
+    sprintf(auxNum, "%lli", libFile->contentSize);
+    memcpy(fileInfo + 48, auxNum, strlen(auxNum));
+    fwrite(fileInfo, sizeof(libFile->fileInfo), 1, file);
+    fwrite(libFile->content, libFile->contentSize, 1, file);
+  }
+
+  fclose(file);
+
+  return true;
 }
 
 void _staticLibFree(_StaticLib* lib)
