@@ -3,7 +3,8 @@
 int main(int, char**)
 {
   FunctionDescriptor functions[] = {
-    {"int", "getRandomInput", ""}
+    {"int", "getRandomInput", ""},
+    {"void", "_ZN7MyClass15internalProcessEv", "void*"}
   };
 
   createMocks(
