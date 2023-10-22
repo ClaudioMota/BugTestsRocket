@@ -58,6 +58,7 @@ bool _createMockFile(char* mockFilePath, int functionCount, FunctionDescriptor* 
   if(!file) return false;
 
   fprintf(file, "#include <stdbool.h>\n"); 
+  fprintf(file, "#ifdef __cplusplus\nextern \"C\"{\n#endif\n"); 
   fprintf(file, "typedef struct FunctionMock{ bool set; char name[256]; void* mockPointer; } FunctionMock;\n");
 
   for(int i = 0; i < functionCount; i++)
@@ -85,6 +86,7 @@ bool _createMockFile(char* mockFilePath, int functionCount, FunctionDescriptor* 
     fprintf(file, "  {true, \"%s\", &_mocked_%s},\n", functions[i].name, functions[i].name);
   }
   fprintf(file, "  {false, \"\", 0}\n};\n");
+  fprintf(file, "#ifdef __cplusplus\n}\n#endif\n"); 
 
   fclose(file);
   return true;

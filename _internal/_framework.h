@@ -39,7 +39,7 @@ void (*setupFunction)(TestEnvironment* env) = _ignore;
 void (*cleanFunction)(TestEnvironment* env) = _ignore;
 void (*onFail)(TestEnvironment* env, int line, char* expr) = _defaultFailure;
 void (*onTestPass)(TestEnvironment* env) = _defaultTestPass;
-void (*onRaise)(int) = (void*)_ignore;
+void (*onRaise)(int) = (void(*)(int))_ignore;
 
 int __numArgsCopy;
 char** _argsCopy;
@@ -50,11 +50,11 @@ extern FunctionMock _mocks[];
 char** _copyArgs(int numArgs, char** args)
 {
   __numArgsCopy = numArgs;
-  char** ret = malloc(sizeof(char*)*numArgs);
+  char** ret = (char**)malloc(sizeof(char*)*numArgs);
 
   for(int i = 0; i < numArgs; i++)
   {
-    ret[i] = malloc(sizeof(char)*(strlen(args[i])+1));
+    ret[i] = (char*)malloc(sizeof(char)*(strlen(args[i])+1));
     strcpy(ret[i], args[i]);
   }
 
@@ -109,15 +109,15 @@ void _defaultFailure(TestEnvironment* env, int line, char* expr)
 
 void _defaultRaiseHandler(int signum)
 {
-  char* signalStr = "SIGOTHER";
+  char* signalStr = _C_STRING_LITERAL("SIGOTHER");
   switch (signum)
   {
-    case SIGABRT: signalStr = "SIGABRT"; break;
-    case SIGFPE: signalStr = "SIGFPE"; break;
-    case SIGILL: signalStr = "SIGILL"; break;
-    case SIGINT: signalStr = "SIGINT"; break;
-    case SIGSEGV: signalStr = "SIGSEGV"; break;
-    case SIGTERM: signalStr = "SIGTERM"; break;
+    case SIGABRT: signalStr = _C_STRING_LITERAL("SIGABRT"); break;
+    case SIGFPE: signalStr = _C_STRING_LITERAL("SIGFPE"); break;
+    case SIGILL: signalStr = _C_STRING_LITERAL("SIGILL"); break;
+    case SIGINT: signalStr = _C_STRING_LITERAL("SIGINT"); break;
+    case SIGSEGV: signalStr = _C_STRING_LITERAL("SIGSEGV"); break;
+    case SIGTERM: signalStr = _C_STRING_LITERAL("SIGTERM"); break;
   }
   onRaise(signum);
   onFail(_currentEnv, _currentEnv->testLine, signalStr);
@@ -197,11 +197,11 @@ int _doRunTest(char* testProgram)
 void _mock(char* functionName, void* function, FunctionMock* mocks)
 {
   void** mockPointer = 0;
-  for(int i = 0; i < mocks[i].set; i++)
+  for(int i = 0; mocks[i].set; i++)
   {
     if(strcmp(mocks[i].name, functionName) == 0)
     {
-      mockPointer = mocks[i].mockPointer;
+      mockPointer = (void**)mocks[i].mockPointer;
       break;
     }
   }
@@ -237,12 +237,12 @@ int findAllTestFiles(char* testRunnerPath, char*** output)
   int index = 0, count = 0, capacity = 0, filteredCount = 0;
   *output = 0;
 
-  char* baseDirPath = malloc(strlen(testRunnerPath) + 1);
+  char* baseDirPath = (char*)malloc(strlen(testRunnerPath) + 1);
   _getDir(testRunnerPath, baseDirPath);
   
   if(!_isDirectory(baseDirPath)) return 0;
   capacity = 1;
-  *output = malloc(sizeof(char*)*capacity);
+  *output = (char**)malloc(sizeof(char*)*capacity);
   (*output)[count++] = baseDirPath;
   while(index < count)
   {
@@ -252,7 +252,7 @@ int findAllTestFiles(char* testRunnerPath, char*** output)
       while(count + dirFileCount >= capacity)
       {
         capacity *= 2;
-        *output = realloc(*output, sizeof(char*)*capacity);
+        *output = (char**)realloc(*output, sizeof(char*)*capacity);
       }
       _listFiles((*output)[index], *output + count);
       count += dirFileCount;
@@ -334,7 +334,7 @@ int _testFileMain(int numArgs, char** args, int (*_allTests)(TestEnvironment*))
   TestEnvironment testEnv = {0};
   _currentEnv = &testEnv;
   int signals[] = {SIGABRT, SIGFPE, SIGILL, SIGINT, SIGSEGV, SIGTERM};
-  for(int i = 0; i < sizeof(signals)/sizeof(int); i++)
+  for(unsigned int i = 0; i < sizeof(signals)/sizeof(int); i++)
     signal(signals[i], _defaultRaiseHandler);
   int _testCount = _allTests(&testEnv);
   memset(&testEnv, 0, sizeof(TestEnvironment));
