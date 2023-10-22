@@ -1,8 +1,9 @@
 CC=gcc
+CPP=g++
 C_FLAGS=-Wall -fPIC
 INCLUDE_PATH= -Iexample
-C_SOURCES=$(shell find example/ -type f -iname "*.c")
-C_TEST_SOURCES=$(shell find tests/ -type f -iname "*.c")
+C_SOURCES=$(shell find example/ -type f -iname "*.c" -o -iname "*.cpp")
+C_TEST_SOURCES=$(shell find tests/ -type f -iname "*.c" -o -iname "*.cpp")
 C_OBJECTS=$(foreach x, $(basename $(C_SOURCES)), build/$(x).o)
 C_TEST_OBJECTS=$(foreach x, $(basename $(C_TEST_SOURCES)), build/$(x))
 
@@ -18,6 +19,9 @@ build/libExample.a: prepare $(C_OBJECTS)
 
 build/libExampleTest.a: build/libExample.a build/mock.c
 
+build/%Cpp.o : %Cpp.cpp
+	$(CPP) $(C_FLAGS) $(INCLUDE_PATH) -c $< -o $@
+
 build/%.o : %.c
 	$(CC) $(C_FLAGS) $(INCLUDE_PATH) -c $< -o $@
 
@@ -29,6 +33,9 @@ build/tests/mockator: tests/mockator.c
 
 build/tests/%: tests/%.c
 	$(CC) $(C_FLAGS) $(INCLUDE_PATH) -g -Itests -Lbuild build/mocks.c $< -o $@ -lExampleTest
+
+build/tests/%: tests/%.cpp
+	$(CPP) $(C_FLAGS) $(INCLUDE_PATH) -g -Itests -Lbuild build/mocks.c $< -o $@ -lExampleTest
 
 prepare:
 	mkdir -p build/example

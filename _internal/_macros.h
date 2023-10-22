@@ -26,6 +26,17 @@
 #ifndef TEST_HEADER
 #define TEST_HEADER 1
 
+#ifdef __cplusplus
+extern "C"
+{
+#define _C_STRING_LITERAL(literal) (char*)literal
+#define class struct
+#define private public
+#define protected public
+#else
+#define _C_STRING_LITERAL(literal) literal
+#endif
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -38,31 +49,30 @@
 #define 🚀 endTests
 
 #define _TEST_HELPER_BLOCK_SIZE 1024
-#define assert(boolean) _assert(_currentEnv, boolean, __LINE__, #boolean)
-#define refute(boolean) _assert(_currentEnv, !(boolean), __LINE__, #boolean)
-#define context(name) _context = name;
+#define assert(boolean) _assert(_currentEnv, boolean, __LINE__, _C_STRING_LITERAL(#boolean))
+#define refute(boolean) _assert(_currentEnv, !(boolean), __LINE__, _C_STRING_LITERAL(#boolean))
+#define context(name) _context = _C_STRING_LITERAL(name);
 
 #define beginTests \
-  int _allTests(TestEnvironment* testEnv){ char* _context = ""; if(_context){}; int _testCount = 0; int _testRunning = 0; {
+  int _allTests(TestEnvironment* testEnv){ char* _context = _C_STRING_LITERAL(""); if(_context){}; int _testCount = 0; int _testRunning = 0; {
 
 #define _finishLastScope() if(_testRunning > 0){ _testRunning--; onTestPass(testEnv); } }
 
 #define test(description) \
   _finishLastScope()\
   testEnv->testIndex = _testCount++;\
-  testEnv->testDescription = description;\
+  testEnv->testDescription = _C_STRING_LITERAL(description);\
   testEnv->testLine = __LINE__;\
-  testEnv->testContext = _context;\
+  testEnv->testContext = _C_STRING_LITERAL(_context);\
   if(_shouldRunTest(testEnv)){\
     if(_testRunning > 0){ printf("\nError nested tests detected %s:%i\n", _sourceFile, __LINE__); }\
     _testRunning++;\
     setupFunction(testEnv);
 
-#define mock(function, newFunction) _mock(#function, newFunction, _mocks);
+#define mock(function, newFunction) _mock(_C_STRING_LITERAL(#function), (void*)newFunction, _mocks);
 
 #define endTests _finishLastScope() return _testCount; }\
   int main(int numArgs, char** args){\
-    _sourceFile = __FILE__;\
+    _sourceFile = _C_STRING_LITERAL(__FILE__);\
     return _testFileMain(numArgs, args, _allTests);\
   }
-  

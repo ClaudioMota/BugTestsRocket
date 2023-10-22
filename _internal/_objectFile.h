@@ -81,7 +81,7 @@ char* _objectFileElfGetString(_StaticLibFile* libFile, _ElfSectionHeader* string
 
 _ElfSymbol* _objectFileElfGetSymbol(_StaticLibFile* libFile, _ElfSectionHeader* symTable, int index)
 {
-  return (void*)&libFile->content[symTable->sh_offset + sizeof(_ElfSymbol)*index];
+  return (_ElfSymbol*)&libFile->content[symTable->sh_offset + sizeof(_ElfSymbol)*index];
 }
 
 bool _objectFileElfIsGlobalFunctionDefinedHere(_ElfSymbol* symbol)
@@ -94,7 +94,7 @@ bool _objectFileElfIsGlobalFunctionDefinedHere(_ElfSymbol* symbol)
 void _objectFileMockElfSymbol(_StaticLibFile* libFile, _ElfHeader header, _ElfSectionHeader* sections, _ElfSectionHeader* symbolTable, _ElfSymbol* symbol, char* to)
 {
   int offset = sizeof(_ElfHeader), addedBytes = 0;
-  char* newContent = malloc(libFile->contentSize*2);
+  char* newContent = (char*)malloc(libFile->contentSize*2);
   memset(newContent, 0, libFile->contentSize*2);
   _ElfSectionHeader* stringTable = &sections[symbolTable->sh_link];
   _ElfSectionHeader* orderedSections[header.e_shnum];
@@ -106,10 +106,10 @@ void _objectFileMockElfSymbol(_StaticLibFile* libFile, _ElfHeader header, _ElfSe
     int minIndex;
     for(int j = 0; j < header.e_shnum; j++)
     {
-      int off = sections[j].sh_offset;
+      long long off = sections[j].sh_offset;
     
       if(off < lastMin || (off == lastMin && j <= lastIndex)) continue;
-      if(!orderedSections[i] || off < orderedSections[i]->sh_offset)
+      if(!orderedSections[i] || off < (long long)orderedSections[i]->sh_offset)
       {
         minIndex = j;
         orderedSections[i] = &sections[j];
@@ -149,7 +149,7 @@ void _objectFileMockElfSymbol(_StaticLibFile* libFile, _ElfHeader header, _ElfSe
     {
       int size = sizeof(_ElfSymbol);
       memcpy(newContent + offset, newSymbol, size);
-      newSymbol = (void*)(newContent + offset);
+      newSymbol = (_ElfSymbol*)(newContent + offset);
       offset += size;
       addedBytes += size;
       current->sh_size += size;
@@ -183,7 +183,7 @@ bool _objectFileMockElfFunction(_StaticLibFile* libFile, _ElfHeader header, char
     if(sections[i].sh_type == 2) symbolTable = &sections[i];
   
   if(!symbolTable) return true;
-  for(int i = 1; i < symbolTable->sh_size/sizeof(_ElfSymbol); i++)
+  for(unsigned int i = 1; i < symbolTable->sh_size/sizeof(_ElfSymbol); i++)
   {
     _ElfSymbol* symbol = _objectFileElfGetSymbol(libFile, symbolTable, i);
     char* name = _objectFileElfGetString(libFile, &sections[symbolTable->sh_link], symbol->st_name);

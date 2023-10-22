@@ -26,6 +26,17 @@
 #ifndef TEST_HEADER
 #define TEST_HEADER 1
 
+#ifdef __cplusplus
+extern "C"
+{
+#define _C_STRING_LITERAL(literal) (char*)literal
+#define class struct
+#define private public
+#define protected public
+#else
+#define _C_STRING_LITERAL(literal) literal
+#endif
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -38,34 +49,34 @@
 #define 🚀 endTests
 
 #define _TEST_HELPER_BLOCK_SIZE 1024
-#define assert(boolean) _assert(_currentEnv, boolean, __LINE__, #boolean)
-#define refute(boolean) _assert(_currentEnv, !(boolean), __LINE__, #boolean)
-#define context(name) _context = name;
+#define assert(boolean) _assert(_currentEnv, boolean, __LINE__, _C_STRING_LITERAL(#boolean))
+#define refute(boolean) _assert(_currentEnv, !(boolean), __LINE__, _C_STRING_LITERAL(#boolean))
+#define context(name) _context = _C_STRING_LITERAL(name);
 
 #define beginTests \
-  int _allTests(TestEnvironment* testEnv){ char* _context = ""; if(_context){}; int _testCount = 0; int _testRunning = 0; {
+  int _allTests(TestEnvironment* testEnv){ char* _context = _C_STRING_LITERAL(""); if(_context){}; int _testCount = 0; int _testRunning = 0; {
 
 #define _finishLastScope() if(_testRunning > 0){ _testRunning--; onTestPass(testEnv); } }
 
 #define test(description) \
   _finishLastScope()\
   testEnv->testIndex = _testCount++;\
-  testEnv->testDescription = description;\
+  testEnv->testDescription = _C_STRING_LITERAL(description);\
   testEnv->testLine = __LINE__;\
-  testEnv->testContext = _context;\
+  testEnv->testContext = _C_STRING_LITERAL(_context);\
   if(_shouldRunTest(testEnv)){\
     if(_testRunning > 0){ printf("\nError nested tests detected %s:%i\n", _sourceFile, __LINE__); }\
     _testRunning++;\
     setupFunction(testEnv);
 
-#define mock(function, newFunction) _mock(#function, newFunction, _mocks);
+#define mock(function, newFunction) _mock(_C_STRING_LITERAL(#function), (void*)newFunction, _mocks);
 
 #define endTests _finishLastScope() return _testCount; }\
   int main(int numArgs, char** args){\
-    _sourceFile = __FILE__;\
+    _sourceFile = _C_STRING_LITERAL(__FILE__);\
     return _testFileMain(numArgs, args, _allTests);\
   }
-  // This content is part of test.h
+// This content is part of test.h
 // Static libraries management
 
 typedef struct _StaticLib _StaticLib;
@@ -145,7 +156,7 @@ bool _staticLibRead(_StaticLib* out, char* path)
     _staticLibSwapIfLittleEndian(&out->header.globalSymbolCount);
     int size = sizeof(_GlobalSymbol)*out->header.globalSymbolCount;
 
-    out->globalSymbols = malloc(size);
+    out->globalSymbols = (_GlobalSymbol*)malloc(size);
     memset(out->globalSymbols, 0, size);
 
     for(int i = 0; i < out->header.globalSymbolCount; i++)
@@ -163,6 +174,7 @@ bool _staticLibRead(_StaticLib* out, char* path)
       while((c = fgetc(file))) *(name++) = c;
     }
 
+    fseek(file, sizeof(_StaticLibHeader) -sizeof(int) + atoi(out->header.size), SEEK_SET);
     int c;
     while((c = getc(file)) != EOF)
     {
@@ -171,12 +183,12 @@ bool _staticLibRead(_StaticLib* out, char* path)
         if(out->globalSymbols[i].fileOffset == ftell(file))
           out->globalSymbols[i].fileIndex = out->fileCount;
       int i = out->fileCount++;
-      out->files = realloc(out->files, sizeof(_StaticLibFile)*out->fileCount);
+      out->files = (_StaticLibFile*)realloc(out->files, sizeof(_StaticLibFile)*out->fileCount);
       _StaticLibFile* libFile = &out->files[i];
       memset(libFile, 0, sizeof(_StaticLibFile));
       fread(libFile->fileInfo, sizeof(libFile->fileInfo), 1, file);
       libFile->contentSize = atoi(&libFile->fileInfo[48]);
-      libFile->content = malloc(libFile->contentSize);
+      libFile->content = (char*)malloc(libFile->contentSize);
       ok = fread(libFile->content, libFile->contentSize, 1, file) == 1;
     }
   }
@@ -326,7 +338,7 @@ char* _objectFileElfGetString(_StaticLibFile* libFile, _ElfSectionHeader* string
 
 _ElfSymbol* _objectFileElfGetSymbol(_StaticLibFile* libFile, _ElfSectionHeader* symTable, int index)
 {
-  return (void*)&libFile->content[symTable->sh_offset + sizeof(_ElfSymbol)*index];
+  return (_ElfSymbol*)&libFile->content[symTable->sh_offset + sizeof(_ElfSymbol)*index];
 }
 
 bool _objectFileElfIsGlobalFunctionDefinedHere(_ElfSymbol* symbol)
@@ -339,7 +351,7 @@ bool _objectFileElfIsGlobalFunctionDefinedHere(_ElfSymbol* symbol)
 void _objectFileMockElfSymbol(_StaticLibFile* libFile, _ElfHeader header, _ElfSectionHeader* sections, _ElfSectionHeader* symbolTable, _ElfSymbol* symbol, char* to)
 {
   int offset = sizeof(_ElfHeader), addedBytes = 0;
-  char* newContent = malloc(libFile->contentSize*2);
+  char* newContent = (char*)malloc(libFile->contentSize*2);
   memset(newContent, 0, libFile->contentSize*2);
   _ElfSectionHeader* stringTable = &sections[symbolTable->sh_link];
   _ElfSectionHeader* orderedSections[header.e_shnum];
@@ -351,10 +363,10 @@ void _objectFileMockElfSymbol(_StaticLibFile* libFile, _ElfHeader header, _ElfSe
     int minIndex;
     for(int j = 0; j < header.e_shnum; j++)
     {
-      int off = sections[j].sh_offset;
+      long long off = sections[j].sh_offset;
     
       if(off < lastMin || (off == lastMin && j <= lastIndex)) continue;
-      if(!orderedSections[i] || off < orderedSections[i]->sh_offset)
+      if(!orderedSections[i] || off < (long long)orderedSections[i]->sh_offset)
       {
         minIndex = j;
         orderedSections[i] = &sections[j];
@@ -394,7 +406,7 @@ void _objectFileMockElfSymbol(_StaticLibFile* libFile, _ElfHeader header, _ElfSe
     {
       int size = sizeof(_ElfSymbol);
       memcpy(newContent + offset, newSymbol, size);
-      newSymbol = (void*)(newContent + offset);
+      newSymbol = (_ElfSymbol*)(newContent + offset);
       offset += size;
       addedBytes += size;
       current->sh_size += size;
@@ -428,7 +440,7 @@ bool _objectFileMockElfFunction(_StaticLibFile* libFile, _ElfHeader header, char
     if(sections[i].sh_type == 2) symbolTable = &sections[i];
   
   if(!symbolTable) return true;
-  for(int i = 1; i < symbolTable->sh_size/sizeof(_ElfSymbol); i++)
+  for(unsigned int i = 1; i < symbolTable->sh_size/sizeof(_ElfSymbol); i++)
   {
     _ElfSymbol* symbol = _objectFileElfGetSymbol(libFile, symbolTable, i);
     char* name = _objectFileElfGetString(libFile, &sections[symbolTable->sh_link], symbol->st_name);
@@ -512,6 +524,7 @@ bool _createMockFile(char* mockFilePath, int functionCount, FunctionDescriptor* 
   if(!file) return false;
 
   fprintf(file, "#include <stdbool.h>\n"); 
+  fprintf(file, "#ifdef __cplusplus\nextern \"C\"{\n#endif\n"); 
   fprintf(file, "typedef struct FunctionMock{ bool set; char name[256]; void* mockPointer; } FunctionMock;\n");
 
   for(int i = 0; i < functionCount; i++)
@@ -539,6 +552,7 @@ bool _createMockFile(char* mockFilePath, int functionCount, FunctionDescriptor* 
     fprintf(file, "  {true, \"%s\", &_mocked_%s},\n", functions[i].name, functions[i].name);
   }
   fprintf(file, "  {false, \"\", 0}\n};\n");
+  fprintf(file, "#ifdef __cplusplus\n}\n#endif\n"); 
 
   fclose(file);
   return true;
@@ -616,7 +630,7 @@ void (*setupFunction)(TestEnvironment* env) = _ignore;
 void (*cleanFunction)(TestEnvironment* env) = _ignore;
 void (*onFail)(TestEnvironment* env, int line, char* expr) = _defaultFailure;
 void (*onTestPass)(TestEnvironment* env) = _defaultTestPass;
-void (*onRaise)(int) = (void*)_ignore;
+void (*onRaise)(int) = (void(*)(int))_ignore;
 
 int __numArgsCopy;
 char** _argsCopy;
@@ -627,11 +641,11 @@ extern FunctionMock _mocks[];
 char** _copyArgs(int numArgs, char** args)
 {
   __numArgsCopy = numArgs;
-  char** ret = malloc(sizeof(char*)*numArgs);
+  char** ret = (char**)malloc(sizeof(char*)*numArgs);
 
   for(int i = 0; i < numArgs; i++)
   {
-    ret[i] = malloc(sizeof(char)*(strlen(args[i])+1));
+    ret[i] = (char*)malloc(sizeof(char)*(strlen(args[i])+1));
     strcpy(ret[i], args[i]);
   }
 
@@ -686,15 +700,15 @@ void _defaultFailure(TestEnvironment* env, int line, char* expr)
 
 void _defaultRaiseHandler(int signum)
 {
-  char* signalStr = "SIGOTHER";
+  char* signalStr = _C_STRING_LITERAL("SIGOTHER");
   switch (signum)
   {
-    case SIGABRT: signalStr = "SIGABRT"; break;
-    case SIGFPE: signalStr = "SIGFPE"; break;
-    case SIGILL: signalStr = "SIGILL"; break;
-    case SIGINT: signalStr = "SIGINT"; break;
-    case SIGSEGV: signalStr = "SIGSEGV"; break;
-    case SIGTERM: signalStr = "SIGTERM"; break;
+    case SIGABRT: signalStr = _C_STRING_LITERAL("SIGABRT"); break;
+    case SIGFPE: signalStr = _C_STRING_LITERAL("SIGFPE"); break;
+    case SIGILL: signalStr = _C_STRING_LITERAL("SIGILL"); break;
+    case SIGINT: signalStr = _C_STRING_LITERAL("SIGINT"); break;
+    case SIGSEGV: signalStr = _C_STRING_LITERAL("SIGSEGV"); break;
+    case SIGTERM: signalStr = _C_STRING_LITERAL("SIGTERM"); break;
   }
   onRaise(signum);
   onFail(_currentEnv, _currentEnv->testLine, signalStr);
@@ -774,11 +788,11 @@ int _doRunTest(char* testProgram)
 void _mock(char* functionName, void* function, FunctionMock* mocks)
 {
   void** mockPointer = 0;
-  for(int i = 0; i < mocks[i].set; i++)
+  for(int i = 0; mocks[i].set; i++)
   {
     if(strcmp(mocks[i].name, functionName) == 0)
     {
-      mockPointer = mocks[i].mockPointer;
+      mockPointer = (void**)mocks[i].mockPointer;
       break;
     }
   }
@@ -814,12 +828,12 @@ int findAllTestFiles(char* testRunnerPath, char*** output)
   int index = 0, count = 0, capacity = 0, filteredCount = 0;
   *output = 0;
 
-  char* baseDirPath = malloc(strlen(testRunnerPath) + 1);
+  char* baseDirPath = (char*)malloc(strlen(testRunnerPath) + 1);
   _getDir(testRunnerPath, baseDirPath);
   
   if(!_isDirectory(baseDirPath)) return 0;
   capacity = 1;
-  *output = malloc(sizeof(char*)*capacity);
+  *output = (char**)malloc(sizeof(char*)*capacity);
   (*output)[count++] = baseDirPath;
   while(index < count)
   {
@@ -829,7 +843,7 @@ int findAllTestFiles(char* testRunnerPath, char*** output)
       while(count + dirFileCount >= capacity)
       {
         capacity *= 2;
-        *output = realloc(*output, sizeof(char*)*capacity);
+        *output = (char**)realloc(*output, sizeof(char*)*capacity);
       }
       _listFiles((*output)[index], *output + count);
       count += dirFileCount;
@@ -911,7 +925,7 @@ int _testFileMain(int numArgs, char** args, int (*_allTests)(TestEnvironment*))
   TestEnvironment testEnv = {0};
   _currentEnv = &testEnv;
   int signals[] = {SIGABRT, SIGFPE, SIGILL, SIGINT, SIGSEGV, SIGTERM};
-  for(int i = 0; i < sizeof(signals)/sizeof(int); i++)
+  for(unsigned int i = 0; i < sizeof(signals)/sizeof(int); i++)
     signal(signals[i], _defaultRaiseHandler);
   int _testCount = _allTests(&testEnv);
   memset(&testEnv, 0, sizeof(TestEnvironment));
@@ -995,7 +1009,7 @@ int _listFiles(char* path, char** output)
       {
         if(output)
         {
-          output[fileCount] = malloc(pathLength + strlen(ent->d_name) + 2);
+          output[fileCount] = (char*)malloc(pathLength + strlen(ent->d_name) + 2);
           strcpy(output[fileCount], path);
           if(path[pathLength-1] != '\\' && path[pathLength-1] != '/')
             strcat(output[fileCount], "/");
@@ -1011,4 +1025,7 @@ int _listFiles(char* path, char** output)
 }
 #endif
 // Ends test.h
+#ifdef __cplusplus
+}
+#endif
 #endif

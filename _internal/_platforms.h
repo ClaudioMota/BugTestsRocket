@@ -73,7 +73,7 @@ int _listFiles(char* path, char** output)
       {
         if(output)
         {
-          output[fileCount] = malloc(pathLength + strlen(ent->d_name) + 2);
+          output[fileCount] = (char*)malloc(pathLength + strlen(ent->d_name) + 2);
           strcpy(output[fileCount], path);
           if(path[pathLength-1] != '\\' && path[pathLength-1] != '/')
             strcat(output[fileCount], "/");

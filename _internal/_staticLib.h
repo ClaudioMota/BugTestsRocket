@@ -78,7 +78,7 @@ bool _staticLibRead(_StaticLib* out, char* path)
     _staticLibSwapIfLittleEndian(&out->header.globalSymbolCount);
     int size = sizeof(_GlobalSymbol)*out->header.globalSymbolCount;
 
-    out->globalSymbols = malloc(size);
+    out->globalSymbols = (_GlobalSymbol*)malloc(size);
     memset(out->globalSymbols, 0, size);
 
     for(int i = 0; i < out->header.globalSymbolCount; i++)
@@ -96,6 +96,7 @@ bool _staticLibRead(_StaticLib* out, char* path)
       while((c = fgetc(file))) *(name++) = c;
     }
 
+    fseek(file, sizeof(_StaticLibHeader) -sizeof(int) + atoi(out->header.size), SEEK_SET);
     int c;
     while((c = getc(file)) != EOF)
     {
@@ -104,12 +105,12 @@ bool _staticLibRead(_StaticLib* out, char* path)
         if(out->globalSymbols[i].fileOffset == ftell(file))
           out->globalSymbols[i].fileIndex = out->fileCount;
       int i = out->fileCount++;
-      out->files = realloc(out->files, sizeof(_StaticLibFile)*out->fileCount);
+      out->files = (_StaticLibFile*)realloc(out->files, sizeof(_StaticLibFile)*out->fileCount);
       _StaticLibFile* libFile = &out->files[i];
       memset(libFile, 0, sizeof(_StaticLibFile));
       fread(libFile->fileInfo, sizeof(libFile->fileInfo), 1, file);
       libFile->contentSize = atoi(&libFile->fileInfo[48]);
-      libFile->content = malloc(libFile->contentSize);
+      libFile->content = (char*)malloc(libFile->contentSize);
       ok = fread(libFile->content, libFile->contentSize, 1, file) == 1;
     }
   }
