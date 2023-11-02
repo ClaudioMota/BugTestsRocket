@@ -7,15 +7,15 @@ typedef struct FunctionDescriptor FunctionDescriptor;
 struct FunctionMock
 {
   bool set;
-  char name[256];
+  char name[_BTR_MAX_NAME_SIZE];
   void* mockPointer;
 };
 
 struct FunctionDescriptor
 {
   char returnType[32];
-  char name[256];
-  char args[256];
+  char name[_BTR_MAX_NAME_SIZE];
+  char args[_BTR_MAX_NAME_SIZE];
 };
 
 int _writeArgs(FILE* file, char* args)
@@ -59,11 +59,11 @@ bool _createMockFile(char* mockFilePath, int functionCount, FunctionDescriptor* 
 
   fprintf(file, "#include <stdbool.h>\n"); 
   fprintf(file, "#ifdef __cplusplus\nextern \"C\"{\n#endif\n"); 
-  fprintf(file, "typedef struct FunctionMock{ bool set; char name[256]; void* mockPointer; } FunctionMock;\n");
+  fprintf(file, "typedef struct FunctionMock{ bool set; char name[512]; void* mockPointer; } FunctionMock;\n");
 
   for(int i = 0; i < functionCount; i++)
   {
-    char mockedName[256];
+    char mockedName[_BTR_MAX_NAME_SIZE];
     _getMockedName(mockedName, functions[i].name);
     fprintf(file, "%s %s(%s);\n", functions[i].returnType, mockedName, functions[i].args);
     fprintf(file, "%s (*_mocked_%s)(%s) = %s;\n", functions[i].returnType, functions[i].name, functions[i].args, mockedName);
