@@ -8,7 +8,7 @@ typedef struct _StaticLibHeader _StaticLibHeader;
 
 struct _GlobalSymbol
 {
-  char name[256];
+  char name[_BTR_MAX_NAME_SIZE];
   int fileOffset;
   int fileIndex;
 };

@@ -76,3 +76,5 @@ extern "C"
     _sourceFile = _C_STRING_LITERAL(__FILE__);\
     return _testFileMain(numArgs, args, _allTests);\
   }
+
+#define _BTR_MAX_NAME_SIZE 512

@@ -76,7 +76,8 @@ extern "C"
     _sourceFile = _C_STRING_LITERAL(__FILE__);\
     return _testFileMain(numArgs, args, _allTests);\
   }
-// This content is part of test.h
+
+#define _BTR_MAX_NAME_SIZE 512// This content is part of test.h
 // Static libraries management
 
 typedef struct _StaticLib _StaticLib;
@@ -86,7 +87,7 @@ typedef struct _StaticLibHeader _StaticLibHeader;
 
 struct _GlobalSymbol
 {
-  char name[256];
+  char name[_BTR_MAX_NAME_SIZE];
   int fileOffset;
   int fileIndex;
 };
@@ -473,15 +474,15 @@ typedef struct FunctionDescriptor FunctionDescriptor;
 struct FunctionMock
 {
   bool set;
-  char name[256];
+  char name[_BTR_MAX_NAME_SIZE];
   void* mockPointer;
 };
 
 struct FunctionDescriptor
 {
   char returnType[32];
-  char name[256];
-  char args[256];
+  char name[_BTR_MAX_NAME_SIZE];
+  char args[_BTR_MAX_NAME_SIZE];
 };
 
 int _writeArgs(FILE* file, char* args)
@@ -525,11 +526,11 @@ bool _createMockFile(char* mockFilePath, int functionCount, FunctionDescriptor* 
 
   fprintf(file, "#include <stdbool.h>\n"); 
   fprintf(file, "#ifdef __cplusplus\nextern \"C\"{\n#endif\n"); 
-  fprintf(file, "typedef struct FunctionMock{ bool set; char name[256]; void* mockPointer; } FunctionMock;\n");
+  fprintf(file, "typedef struct FunctionMock{ bool set; char name[512]; void* mockPointer; } FunctionMock;\n");
 
   for(int i = 0; i < functionCount; i++)
   {
-    char mockedName[256];
+    char mockedName[_BTR_MAX_NAME_SIZE];
     _getMockedName(mockedName, functions[i].name);
     fprintf(file, "%s %s(%s);\n", functions[i].returnType, mockedName, functions[i].args);
     fprintf(file, "%s (*_mocked_%s)(%s) = %s;\n", functions[i].returnType, functions[i].name, functions[i].args, mockedName);
@@ -797,7 +798,7 @@ void _mock(char* functionName, void* function, FunctionMock* mocks)
     }
   }
 
-  char message[256];
+  char message[_BTR_MAX_NAME_SIZE];
   strcpy(message, "Could not mock function ");
   strcat(message, functionName);
   if(!mockPointer) onFail(_currentEnv, _currentEnv->testLine, message);

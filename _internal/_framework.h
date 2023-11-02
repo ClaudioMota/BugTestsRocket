@@ -206,7 +206,7 @@ void _mock(char* functionName, void* function, FunctionMock* mocks)
     }
   }
 
-  char message[256];
+  char message[_BTR_MAX_NAME_SIZE];
   strcpy(message, "Could not mock function ");
   strcat(message, functionName);
   if(!mockPointer) onFail(_currentEnv, _currentEnv->testLine, message);
