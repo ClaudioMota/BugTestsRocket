@@ -49,27 +49,29 @@ extern "C"
 #define 🚀 endTests
 
 #define _TEST_HELPER_BLOCK_SIZE 1024
-#define assert(boolean) _assert(_currentEnv, boolean, __LINE__, _C_STRING_LITERAL(#boolean))
-#define refute(boolean) _assert(_currentEnv, !(boolean), __LINE__, _C_STRING_LITERAL(#boolean))
+#define assert(boolean) _assert(_C_STRING_LITERAL(__FILE__), __LINE__, boolean, _C_STRING_LITERAL(#boolean))
+#define refute(boolean) _assert(_C_STRING_LITERAL(__FILE__), __LINE__, !(boolean), _C_STRING_LITERAL(#boolean))
 #define context(name) _context = _C_STRING_LITERAL(name);
 
 #define beginTests \
-  int _allTests(TestEnvironment* testEnv){ char* _context = _C_STRING_LITERAL(""); if(_context){}; int _testCount = 0; int _testRunning = 0; {
+  int _allTests(){ char* _context = _C_STRING_LITERAL(""); if(_context){}; int _testCount = 0; int _testRunning = 0; {
 
-#define _finishLastScope() if(_testRunning > 0){ _testRunning--; onTestPass(testEnv); } }
+#define _finishLastScope() if(_testRunning > 0){ _testRunning--; onTestPass(); } }
 
 #define test(description) \
   _finishLastScope()\
-  testEnv->testIndex = _testCount++;\
-  testEnv->testDescription = _C_STRING_LITERAL(description);\
-  testEnv->testLine = __LINE__;\
-  testEnv->testContext = _C_STRING_LITERAL(_context);\
-  if(_shouldRunTest(testEnv)){\
-    if(_testRunning > 0){ printf("\nError nested tests detected %s:%i\n", _sourceFile, __LINE__); }\
+  if(_shouldRunTest(_testCount++, __LINE__, _context)){\
+    testEnv->testIndex = _testCount-1;\
+    testEnv->testDescription = _C_STRING_LITERAL(description);\
+    testEnv->testLine = __LINE__;\
+    testEnv->testContext = _C_STRING_LITERAL(_context);\
+    if(_testRunning > 0){ onFail(_C_STRING_LITERAL(__FILE__), __LINE__, _C_STRING_LITERAL("nested tests detected")); }\
     _testRunning++;\
-    setupFunction(testEnv);
+    setupFunction();
 
-#define mock(function, newFunction) _mock(_C_STRING_LITERAL(#function), (void*)newFunction, _mocks);
+#define mock(function, newFunction) _mock(_C_STRING_LITERAL(__FILE__), __LINE__, _C_STRING_LITERAL(#function), (void*)newFunction, _mocks);
+
+#define helperBlockAs(env, type, index) (type*)&(((char*)env->helperBlock)[sizeof(type)*index])
 
 #define endTests _finishLastScope() return _testCount; }\
   int main(int numArgs, char** args){\

@@ -49,27 +49,29 @@ extern "C"
 #define 🚀 endTests
 
 #define _TEST_HELPER_BLOCK_SIZE 1024
-#define assert(boolean) _assert(_currentEnv, boolean, __LINE__, _C_STRING_LITERAL(#boolean))
-#define refute(boolean) _assert(_currentEnv, !(boolean), __LINE__, _C_STRING_LITERAL(#boolean))
+#define assert(boolean) _assert(_C_STRING_LITERAL(__FILE__), __LINE__, boolean, _C_STRING_LITERAL(#boolean))
+#define refute(boolean) _assert(_C_STRING_LITERAL(__FILE__), __LINE__, !(boolean), _C_STRING_LITERAL(#boolean))
 #define context(name) _context = _C_STRING_LITERAL(name);
 
 #define beginTests \
-  int _allTests(TestEnvironment* testEnv){ char* _context = _C_STRING_LITERAL(""); if(_context){}; int _testCount = 0; int _testRunning = 0; {
+  int _allTests(){ char* _context = _C_STRING_LITERAL(""); if(_context){}; int _testCount = 0; int _testRunning = 0; {
 
-#define _finishLastScope() if(_testRunning > 0){ _testRunning--; onTestPass(testEnv); } }
+#define _finishLastScope() if(_testRunning > 0){ _testRunning--; onTestPass(); } }
 
 #define test(description) \
   _finishLastScope()\
-  testEnv->testIndex = _testCount++;\
-  testEnv->testDescription = _C_STRING_LITERAL(description);\
-  testEnv->testLine = __LINE__;\
-  testEnv->testContext = _C_STRING_LITERAL(_context);\
-  if(_shouldRunTest(testEnv)){\
-    if(_testRunning > 0){ printf("\nError nested tests detected %s:%i\n", _sourceFile, __LINE__); }\
+  if(_shouldRunTest(_testCount++, __LINE__, _context)){\
+    testEnv->testIndex = _testCount-1;\
+    testEnv->testDescription = _C_STRING_LITERAL(description);\
+    testEnv->testLine = __LINE__;\
+    testEnv->testContext = _C_STRING_LITERAL(_context);\
+    if(_testRunning > 0){ onFail(_C_STRING_LITERAL(__FILE__), __LINE__, _C_STRING_LITERAL("nested tests detected")); }\
     _testRunning++;\
-    setupFunction(testEnv);
+    setupFunction();
 
-#define mock(function, newFunction) _mock(_C_STRING_LITERAL(#function), (void*)newFunction, _mocks);
+#define mock(function, newFunction) _mock(_C_STRING_LITERAL(__FILE__), __LINE__, _C_STRING_LITERAL(#function), (void*)newFunction, _mocks);
+
+#define helperBlockAs(env, type, index) (type*)&(((char*)env->helperBlock)[sizeof(type)*index])
 
 #define endTests _finishLastScope() return _testCount; }\
   int main(int numArgs, char** args){\
@@ -623,20 +625,20 @@ struct TestEnvironment
   void* helperBlock[_TEST_HELPER_BLOCK_SIZE];
 };
 
-void _ignore(TestEnvironment* env);
-void _defaultTestPass(TestEnvironment* env);
-void _defaultFailure(TestEnvironment* env, int line, char* expr);
+void _ignore();
+void _defaultTestPass();
+void _defaultFailure(char* file, int line, char* expr);
 
-void (*setupFunction)(TestEnvironment* env) = _ignore;
-void (*cleanFunction)(TestEnvironment* env) = _ignore;
-void (*onFail)(TestEnvironment* env, int line, char* expr) = _defaultFailure;
-void (*onTestPass)(TestEnvironment* env) = _defaultTestPass;
+void (*setupFunction)() = _ignore;
+void (*cleanFunction)() = _ignore;
+void (*onFail)(char* file, int line, char* expr) = _defaultFailure;
+void (*onTestPass)() = _defaultTestPass;
 void (*onRaise)(int) = (void(*)(int))_ignore;
 
 int __numArgsCopy;
 char** _argsCopy;
 char* _sourceFile;
-TestEnvironment* _currentEnv = 0;
+TestEnvironment* testEnv = 0;
 extern FunctionMock _mocks[];
 
 char** _copyArgs(int numArgs, char** args)
@@ -665,36 +667,36 @@ void _freeArgsCopy()
   _argsCopy = 0;
 }
 
-void _ignore(TestEnvironment* env){}
+void _ignore(){}
 
-bool _shouldRunTest(TestEnvironment* env)
+bool _shouldRunTest(int index, int line, char* context)
 {
-  int mode = env->selection.mode;
+  int mode = testEnv->selection.mode;
   if(mode == _TEST_SELECT_MODE_NONE) return false;
-  if((mode & _TEST_SELECT_MODE_INDEX) && env->testIndex != env->selection.index)
+  if((mode & _TEST_SELECT_MODE_INDEX) && index != testEnv->selection.index)
     return false;
-  if((mode & _TEST_SELECT_MODE_MODULE) && !strstr(_sourceFile, env->selection.name) && (!env->testContext || strcmp(env->testContext, env->selection.name) != 0))
+  if((mode & _TEST_SELECT_MODE_MODULE) && !strstr(_sourceFile, testEnv->selection.name) && (!context || strcmp(context, testEnv->selection.name) != 0))
     return false;
-  if((mode & _TEST_SELECT_MODE_LINE) && env->testLine != env->selection.line)
+  if((mode & _TEST_SELECT_MODE_LINE) && line != testEnv->selection.line)
     return false;
 
   return true;
 }
 
-void _defaultTestPass(TestEnvironment* env)
+void _defaultTestPass()
 {
   printf(".");
-  cleanFunction(env);
+  cleanFunction();
 }
 
-void _defaultFailure(TestEnvironment* env, int line, char* expr)
+void _defaultFailure(char* file, int line, char* expr)
 {
-  if(env->testContext)
-    printf("\n[FAIL] on \"%s\" test \"%s\" failed %s:%i (%s)\n", env->testContext, env->testDescription, _sourceFile, line, expr);
+  if(testEnv->testContext)
+    printf("\n[FAIL] on \"%s\" test \"%s\" failed %s:%i (%s)\n", testEnv->testContext, testEnv->testDescription, file, line, expr);
   else
-    printf("\n[FAIL] test \"%s\" failed %s:%i (%s)\n", env->testDescription, _sourceFile, line, expr);
+    printf("\n[FAIL] test \"%s\" failed %s:%i (%s)\n", testEnv->testDescription, file, line, expr);
   
-  cleanFunction(env);
+  cleanFunction();
   _freeArgsCopy();
   exit(0);
 }
@@ -712,12 +714,12 @@ void _defaultRaiseHandler(int signum)
     case SIGTERM: signalStr = _C_STRING_LITERAL("SIGTERM"); break;
   }
   onRaise(signum);
-  onFail(_currentEnv, _currentEnv->testLine, signalStr);
+  onFail(_sourceFile, testEnv->testLine, signalStr);
 }
 
-void _assert(TestEnvironment* env, bool assertion, int line, char* expr)
+void _assert(char* file, int line, bool assertion, char* expr)
 {
-  if(!assertion) onFail(env, line, expr);
+  if(!assertion) onFail(file, line, expr);
 }
 
 _TestSelect _getArgsSelection(int numArgs, char** args)
@@ -786,7 +788,7 @@ int _doRunTest(char* testProgram)
   return WEXITSTATUS(status);
 }
 
-void _mock(char* functionName, void* function, FunctionMock* mocks)
+void _mock(char* file, int line, char* functionName, void* function, FunctionMock* mocks)
 {
   void** mockPointer = 0;
   for(int i = 0; mocks[i].set; i++)
@@ -801,7 +803,7 @@ void _mock(char* functionName, void* function, FunctionMock* mocks)
   char message[_BTR_MAX_NAME_SIZE];
   strcpy(message, "Could not mock function ");
   strcat(message, functionName);
-  if(!mockPointer) onFail(_currentEnv, _currentEnv->testLine, message);
+  if(!mockPointer) onFail(file, line, message);
 
   *mockPointer = function;
 }
@@ -920,18 +922,21 @@ int runAllTests(int numArgs, char** args)
   return failures;
 }
 
-int _testFileMain(int numArgs, char** args, int (*_allTests)(TestEnvironment*))
+int _testFileMain(int numArgs, char** args, int (*_allTests)())
 {
   args = _copyArgs(numArgs, args);
-  TestEnvironment testEnv = {0};
-  _currentEnv = &testEnv;
+  TestEnvironment _testEnv = {0};
+  testEnv = &_testEnv;
+  _testEnv.testContext = _C_STRING_LITERAL("global");
+  _testEnv.testDescription = _C_STRING_LITERAL("setup");
+
   int signals[] = {SIGABRT, SIGFPE, SIGILL, SIGINT, SIGSEGV, SIGTERM};
   for(unsigned int i = 0; i < sizeof(signals)/sizeof(int); i++)
     signal(signals[i], _defaultRaiseHandler);
-  int _testCount = _allTests(&testEnv);
-  memset(&testEnv, 0, sizeof(TestEnvironment));
-  testEnv.selection = _getArgsSelection(numArgs, args);
-  _allTests(&testEnv);
+  int _testCount = _allTests();
+  memset(&_testEnv, 0, sizeof(TestEnvironment));
+  _testEnv.selection = _getArgsSelection(numArgs, args);
+  _allTests();
   _freeArgsCopy();
   return _testCount;
 }
