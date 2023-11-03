@@ -51,21 +51,21 @@ extern "C"
 #define _TEST_HELPER_BLOCK_SIZE 1024
 #define assert(boolean) _assert(_C_STRING_LITERAL(__FILE__), __LINE__, boolean, _C_STRING_LITERAL(#boolean))
 #define refute(boolean) _assert(_C_STRING_LITERAL(__FILE__), __LINE__, !(boolean), _C_STRING_LITERAL(#boolean))
-#define context(name) _context = _C_STRING_LITERAL(name);
 
 #define beginTests \
-  int _allTests(){ char* _context = _C_STRING_LITERAL(""); if(_context){}; int _testCount = 0; int _testRunning = 0; {
+  int _allTests(){ int _testCount = 0; int _testRunning = 0; int _testDefinition = 0; {
 
-#define _finishLastScope() if(_testRunning > 0){ _testRunning--; onTestPass(); } }
+#define _finishLastScope() if(_testRunning > 0){ _testRunning--; onTestPass(); } }\
+  if(_testDefinition > 0){ _testDefinition--;\
+  if(_testDefinition != 0) onFail(_C_STRING_LITERAL(__FILE__), __LINE__, _C_STRING_LITERAL("test scope has been compromised"));}\
+  
+#define context(name) _finishLastScope() _setContext(_C_STRING_LITERAL(name)); {
 
 #define test(description) \
   _finishLastScope()\
-  if(_shouldRunTest(_testCount++, __LINE__, _context)){\
-    testEnv->testIndex = _testCount-1;\
-    testEnv->testDescription = _C_STRING_LITERAL(description);\
-    testEnv->testLine = __LINE__;\
-    testEnv->testContext = _C_STRING_LITERAL(_context);\
-    if(_testRunning > 0){ onFail(_C_STRING_LITERAL(__FILE__), __LINE__, _C_STRING_LITERAL("nested tests detected")); }\
+  _testDefinition++;\
+  if(_shouldRunTest(_testCount++, __LINE__, testEnv->_candidateContext)){\
+    _initializeTest(_testCount-1, __LINE__, _C_STRING_LITERAL(description));\
     _testRunning++;\
     setupFunction();
 
@@ -595,6 +595,7 @@ bool createMocks(char* libPath, char* mockableLibPath, char* mockFilePath, int f
 // This content is part of test.h
 // Main testing functionalities
 typedef struct _TestSelect _TestSelect;
+typedef struct _TestContext _TestContext;
 typedef struct TestEnvironment TestEnvironment;
 
 enum _TestSelectMode
@@ -612,8 +613,20 @@ struct _TestSelect
   char* name;
 };
 
+struct _TestContext
+{
+  bool set;
+  void (*setupFunction)();
+  void (*cleanFunction)();
+  void (*onFail)(char* file, int line, char* expr);
+  void (*onTestPass)();
+  void (*onRaise)(int);
+};
+
 struct TestEnvironment
 {
+  _TestContext globalContext;
+  char* _candidateContext;
   char* testContext;
   int testIndex;
   char* testDescription;
@@ -640,6 +653,33 @@ char** _argsCopy;
 char* _sourceFile;
 TestEnvironment* testEnv = 0;
 extern FunctionMock _mocks[];
+
+void _setContext(char* contextName)
+{
+  if(!testEnv->globalContext.set)
+  {
+    testEnv->globalContext.set = true;
+    testEnv->globalContext.setupFunction = setupFunction;
+    testEnv->globalContext.cleanFunction = cleanFunction;
+    testEnv->globalContext.onFail = onFail;
+    testEnv->globalContext.onTestPass = onTestPass;
+    testEnv->globalContext.onRaise = onRaise;
+  }
+  setupFunction = testEnv->globalContext.setupFunction;
+  cleanFunction = testEnv->globalContext.cleanFunction;
+  onFail = testEnv->globalContext.onFail;
+  onTestPass = testEnv->globalContext.onTestPass;
+  onRaise = testEnv->globalContext.onRaise;
+  testEnv->_candidateContext = contextName;
+}
+
+void _initializeTest(int index, int line, char* description)
+{
+  testEnv->testIndex = index;
+  testEnv->testDescription = description;
+  testEnv->testLine = __LINE__;
+  testEnv->testContext = testEnv->_candidateContext;
+}
 
 char** _copyArgs(int numArgs, char** args)
 {
@@ -673,6 +713,8 @@ bool _shouldRunTest(int index, int line, char* context)
 {
   int mode = testEnv->selection.mode;
   if(mode == _TEST_SELECT_MODE_NONE) return false;
+  if(!((mode & _TEST_SELECT_MODE_INDEX) || (mode & _TEST_SELECT_MODE_LINE)))
+    return false;
   if((mode & _TEST_SELECT_MODE_INDEX) && index != testEnv->selection.index)
     return false;
   if((mode & _TEST_SELECT_MODE_MODULE) && !strstr(_sourceFile, testEnv->selection.name) && (!context || strcmp(context, testEnv->selection.name) != 0))
@@ -691,12 +733,11 @@ void _defaultTestPass()
 
 void _defaultFailure(char* file, int line, char* expr)
 {
-  if(testEnv->testContext)
-    printf("\n[FAIL] on \"%s\" test \"%s\" failed %s:%i (%s)\n", testEnv->testContext, testEnv->testDescription, file, line, expr);
-  else
-    printf("\n[FAIL] test \"%s\" failed %s:%i (%s)\n", testEnv->testDescription, file, line, expr);
+  printf("\n[FAIL] on \"%s\" test \"%s\" failed %s:%i (%s)\n", testEnv->testContext, testEnv->testDescription, file, line, expr);
   
-  cleanFunction();
+  void (*noLoopClean)() = cleanFunction;
+  cleanFunction = _ignore;
+  noLoopClean();
   _freeArgsCopy();
   exit(0);
 }

@@ -51,21 +51,21 @@ extern "C"
 #define _TEST_HELPER_BLOCK_SIZE 1024
 #define assert(boolean) _assert(_C_STRING_LITERAL(__FILE__), __LINE__, boolean, _C_STRING_LITERAL(#boolean))
 #define refute(boolean) _assert(_C_STRING_LITERAL(__FILE__), __LINE__, !(boolean), _C_STRING_LITERAL(#boolean))
-#define context(name) _context = _C_STRING_LITERAL(name);
 
 #define beginTests \
-  int _allTests(){ char* _context = _C_STRING_LITERAL(""); if(_context){}; int _testCount = 0; int _testRunning = 0; {
+  int _allTests(){ int _testCount = 0; int _testRunning = 0; int _testDefinition = 0; {
 
-#define _finishLastScope() if(_testRunning > 0){ _testRunning--; onTestPass(); } }
+#define _finishLastScope() if(_testRunning > 0){ _testRunning--; onTestPass(); } }\
+  if(_testDefinition > 0){ _testDefinition--;\
+  if(_testDefinition != 0) onFail(_C_STRING_LITERAL(__FILE__), __LINE__, _C_STRING_LITERAL("test scope has been compromised"));}\
+  
+#define context(name) _finishLastScope() _setContext(_C_STRING_LITERAL(name)); {
 
 #define test(description) \
   _finishLastScope()\
-  if(_shouldRunTest(_testCount++, __LINE__, _context)){\
-    testEnv->testIndex = _testCount-1;\
-    testEnv->testDescription = _C_STRING_LITERAL(description);\
-    testEnv->testLine = __LINE__;\
-    testEnv->testContext = _C_STRING_LITERAL(_context);\
-    if(_testRunning > 0){ onFail(_C_STRING_LITERAL(__FILE__), __LINE__, _C_STRING_LITERAL("nested tests detected")); }\
+  _testDefinition++;\
+  if(_shouldRunTest(_testCount++, __LINE__, testEnv->_candidateContext)){\
+    _initializeTest(_testCount-1, __LINE__, _C_STRING_LITERAL(description));\
     _testRunning++;\
     setupFunction();
 
