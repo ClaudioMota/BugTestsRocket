@@ -44,8 +44,8 @@ struct TestEnvironment
 
   _TestSelect selection;
 
-  void* helperPointer;
-  void* helperBlock[_TEST_HELPER_BLOCK_SIZE];
+  void* _helperBlockIndex;
+  void* helperMemoryBlock[_TEST_HELPER_BLOCK_SIZE];
 };
 
 struct FunctionMock
@@ -412,6 +412,7 @@ int _testFileMain(int numArgs, char** args, int (*_allTests)())
     signal(signals[i], _defaultRaiseHandler);
 
   _testEnv = (TestEnvironment){0};
+  _testEnv._helperBlockIndex = &_testEnv.helperMemoryBlock[0];
   _testEnv.testContext = _C_STRING_LITERAL("global");
   _testEnv.testDescription = _C_STRING_LITERAL("setup");
   int _testCount = _allTests();
@@ -419,6 +420,7 @@ int _testFileMain(int numArgs, char** args, int (*_allTests)())
   if(snapShot) free(snapShot);
   
   _testEnv = (TestEnvironment){0};
+  _testEnv._helperBlockIndex = &_testEnv.helperMemoryBlock[0];
   _testEnv.testContext = _C_STRING_LITERAL("global");
   _testEnv.testDescription = _C_STRING_LITERAL("setup");
   _testEnv.selection = _getArgsSelection(numArgs, args);

@@ -48,9 +48,11 @@ extern "C"
 #define 🐛 beginTests
 #define 🚀 endTests
 
-#define _TEST_HELPER_BLOCK_SIZE 1024
+#define _TEST_HELPER_BLOCK_SIZE 10240
 #define assert(boolean) _assert(_C_STRING_LITERAL(__FILE__), __LINE__, boolean, _C_STRING_LITERAL(#boolean))
+#define assert_called(mockedFunction) assert(mockCalled(mockedFunction) > 0)
 #define refute(boolean) _assert(_C_STRING_LITERAL(__FILE__), __LINE__, !(boolean), _C_STRING_LITERAL(#boolean))
+#define refute_called(mockedFunction) assert(mockCalled(mockedFunction) == 0)
 
 #define beginTests \
   int _allTests(){ int _testCount = 0; int _testRunning = 0; int _testDefinition = 0; {
@@ -77,7 +79,7 @@ extern "C"
 
 #define mockGetOrginal(function) _getMock(_C_STRING_LITERAL(__FILE__), __LINE__, _C_STRING_LITERAL(#function), _mocks)->original
 
-#define helperBlockAs(env, type, index) (type*)&(((char*)env->helperBlock)[sizeof(type)*index])
+#define testAlloc(type) (type*)(testEnv->_helperBlockIndex += sizeof(type), testEnv->_helperBlockIndex - sizeof(type))
 
 #define endTests _finishLastScope() return _testCount; }\
   int main(int numArgs, char** args){\
