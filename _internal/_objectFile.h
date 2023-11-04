@@ -1,5 +1,6 @@
 // This content is part of test.h
 // Object files and symbol management
+// Based on https://uclibc.org/docs/elf-64-gen.pdf
 
 typedef struct _ElfRel _ElfRel;
 typedef struct _ElfRela _ElfRela;
@@ -65,11 +66,15 @@ struct _ElfSymbol
 bool _objectFileIsSupportedElf64(_ElfHeader* header)
 {
   if(header->e_ident[0] == 0x7f && header->e_ident[1] == 'E' && header->e_ident[2] == 'L' && header->e_ident[3] == 'F' && header->e_ident[4] == 2 &&
-     header->e_type == 1 && header->e_ident[7] == 0 && header->e_entry == 0 && header->e_phoff == 0 && header->e_phentsize == 0 && header->e_phnum == 0 &&
+     header->e_type == 1 && header->e_entry == 0 && header->e_phoff == 0 && header->e_phentsize == 0 && header->e_phnum == 0 &&
      header->e_shentsize == sizeof(_ElfSectionHeader)
     )
     return true;
   
+  // printf("Is this an ELF64 .o??: %x %c%c%c i4: %i t: %i i7: %i e: %li poff: %li psize: %i pnum: %i hsize: %i(%li)\n",
+  //  header->e_ident[0], header->e_ident[1], header->e_ident[2],header->e_ident[3],
+  //  header->e_ident[4], header->e_type, header->e_ident[7], header->e_entry, header->e_phoff,
+  //  header->e_phentsize, header->e_phnum, header->e_shentsize, sizeof(_ElfSectionHeader));
   
   return false;
 }
@@ -203,7 +208,5 @@ bool _objectFileMockFunction(_StaticLibFile* libFile, char* from, char* to)
   memcpy(&elfHeader, libFile->content, sizeof(_ElfHeader));
   if(_objectFileIsSupportedElf64(&elfHeader))
     return _objectFileMockElfFunction(libFile, elfHeader, from, to);
-
-  printf("Lib not supported. Must be a ELF64 relocatable lib. Try adding --fPIC to your compiler flags.\n");
   return false;
 }
