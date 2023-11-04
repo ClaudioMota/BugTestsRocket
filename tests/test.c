@@ -3,8 +3,8 @@
 int doCreateMocks()
 {
   FunctionDescriptor functions[] = {
-      {"int", "getRandomInput", ""},
-      {"void", "_ZN7MyClass15internalProcessEv", "void*"}
+      {"int", "getRandomInput", "", 0},
+      {"void", "_ZN7MyClass15internalProcessEv", "void*", 0}
   };
 
   return !createMocks(

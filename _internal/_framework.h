@@ -62,6 +62,7 @@ struct FunctionDescriptor
   char returnType[32];
   char name[_BTR_MAX_NAME_SIZE];
   char args[_BTR_MAX_NAME_SIZE];
+  char* implementation;
 };
 
 void _ignore();
