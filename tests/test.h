@@ -71,7 +71,7 @@ extern "C"
 
 #define mock(function, newFunction) _mock(_C_STRING_LITERAL(__FILE__), __LINE__, _C_STRING_LITERAL(#function), (void*)newFunction, _mocks)
 
-#define mockReset(function) _mockReset(_C_STRING_LITERAL(__FILE__), __LINE__, _C_STRING_LITERAL(#function), (void*)newFunction, _mocks)
+#define mockReset(function) _mockReset(_C_STRING_LITERAL(__FILE__), __LINE__, _C_STRING_LITERAL(#function), _mocks)
 
 #define mockCalls(function) _getMock(_C_STRING_LITERAL(__FILE__), __LINE__, _C_STRING_LITERAL(#function), _mocks)->calls
 
@@ -266,6 +266,7 @@ void _staticLibFree(_StaticLib* lib)
 }
 // This content is part of test.h
 // Object files and symbol management
+// Based on https://uclibc.org/docs/elf-64-gen.pdf
 
 typedef struct _ElfRel _ElfRel;
 typedef struct _ElfRela _ElfRela;
@@ -331,11 +332,15 @@ struct _ElfSymbol
 bool _objectFileIsSupportedElf64(_ElfHeader* header)
 {
   if(header->e_ident[0] == 0x7f && header->e_ident[1] == 'E' && header->e_ident[2] == 'L' && header->e_ident[3] == 'F' && header->e_ident[4] == 2 &&
-     header->e_type == 1 && header->e_ident[7] == 0 && header->e_entry == 0 && header->e_phoff == 0 && header->e_phentsize == 0 && header->e_phnum == 0 &&
+     header->e_type == 1 && header->e_entry == 0 && header->e_phoff == 0 && header->e_phentsize == 0 && header->e_phnum == 0 &&
      header->e_shentsize == sizeof(_ElfSectionHeader)
     )
     return true;
   
+  // printf("Is this an ELF64 .o??: %x %c%c%c i4: %i t: %i i7: %i e: %li poff: %li psize: %i pnum: %i hsize: %i(%li)\n",
+  //  header->e_ident[0], header->e_ident[1], header->e_ident[2],header->e_ident[3],
+  //  header->e_ident[4], header->e_type, header->e_ident[7], header->e_entry, header->e_phoff,
+  //  header->e_phentsize, header->e_phnum, header->e_shentsize, sizeof(_ElfSectionHeader));
   
   return false;
 }
@@ -469,8 +474,6 @@ bool _objectFileMockFunction(_StaticLibFile* libFile, char* from, char* to)
   memcpy(&elfHeader, libFile->content, sizeof(_ElfHeader));
   if(_objectFileIsSupportedElf64(&elfHeader))
     return _objectFileMockElfFunction(libFile, elfHeader, from, to);
-
-  printf("Lib not supported. Must be a ELF64 relocatable lib. Try adding --fPIC to your compiler flags.\n");
   return false;
 }
 // This content is part of test.h
@@ -976,7 +979,7 @@ void _mock(char* file, int line, char* functionName, void* function, FunctionMoc
   if(mock) *((void**)mock->mockPointer) = function;
 }
 
-void _mockReset(char* file, int line, char* functionName, void* function, FunctionMock* mocks)
+void _mockReset(char* file, int line, char* functionName, FunctionMock* mocks)
 {
   FunctionMock* mock = _getMock(file, line, functionName, mocks);
   if(mock) *((void**)mock->mockPointer) = mock->original;
@@ -1050,7 +1053,12 @@ bool createMocks(char* libPath, char* mockableLibPath, char* mockFilePath, int f
           strcpy(lib.globalSymbols[i].name, mockedName);
     
       for(int i = 0; i < lib.fileCount; i++)
-        _objectFileMockFunction(&lib.files[i], functions[f].name, mockedName);
+      {
+        if(memcmp(lib.files[i].fileInfo, "/", 1) != 0)
+          if(!_objectFileMockFunction(&lib.files[i], functions[f].name, mockedName))
+              printf("Could not mock object file %s. Supported formats are ELF64. Symbols must be relocatable. Maybe try adding --fPIC to your compiler flags?\n",
+                    lib.files[i].fileInfo);
+      }
     }
     
     ret = _staticLibWrite(&lib, mockableLibPath);

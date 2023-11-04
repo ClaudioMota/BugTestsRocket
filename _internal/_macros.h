@@ -71,7 +71,7 @@ extern "C"
 
 #define mock(function, newFunction) _mock(_C_STRING_LITERAL(__FILE__), __LINE__, _C_STRING_LITERAL(#function), (void*)newFunction, _mocks)
 
-#define mockReset(function) _mockReset(_C_STRING_LITERAL(__FILE__), __LINE__, _C_STRING_LITERAL(#function), (void*)newFunction, _mocks)
+#define mockReset(function) _mockReset(_C_STRING_LITERAL(__FILE__), __LINE__, _C_STRING_LITERAL(#function), _mocks)
 
 #define mockCalls(function) _getMock(_C_STRING_LITERAL(__FILE__), __LINE__, _C_STRING_LITERAL(#function), _mocks)->calls
 

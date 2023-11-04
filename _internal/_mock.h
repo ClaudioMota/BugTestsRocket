@@ -69,7 +69,7 @@ void _mock(char* file, int line, char* functionName, void* function, FunctionMoc
   if(mock) *((void**)mock->mockPointer) = function;
 }
 
-void _mockReset(char* file, int line, char* functionName, void* function, FunctionMock* mocks)
+void _mockReset(char* file, int line, char* functionName, FunctionMock* mocks)
 {
   FunctionMock* mock = _getMock(file, line, functionName, mocks);
   if(mock) *((void**)mock->mockPointer) = mock->original;
@@ -143,7 +143,12 @@ bool createMocks(char* libPath, char* mockableLibPath, char* mockFilePath, int f
           strcpy(lib.globalSymbols[i].name, mockedName);
     
       for(int i = 0; i < lib.fileCount; i++)
-        _objectFileMockFunction(&lib.files[i], functions[f].name, mockedName);
+      {
+        if(memcmp(lib.files[i].fileInfo, "/", 1) != 0)
+          if(!_objectFileMockFunction(&lib.files[i], functions[f].name, mockedName))
+              printf("Could not mock object file %s. Supported formats are ELF64. Symbols must be relocatable. Maybe try adding --fPIC to your compiler flags?\n",
+                    lib.files[i].fileInfo);
+      }
     }
     
     ret = _staticLibWrite(&lib, mockableLibPath);
