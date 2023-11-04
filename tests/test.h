@@ -998,7 +998,7 @@ bool _createMockFile(char* mockFilePath, int functionCount, FunctionDescriptor* 
   fprintf(file, "// It must be included after test.h and any eventual required typedefs\n");
   fprintf(file, "#ifdef BUG_TESTS_ROCKET_TEST_HEADER\n");
   fprintf(file, "#ifdef __cplusplus\nextern \"C\"{\n"
-                "#define _BTR_CONVERT(what, to) reiterpret_cast<to>(what)\n"
+                "#define _BTR_CONVERT(what, to) reinterpret_cast<to>(what)\n"
                 "#else\n"
                 "#define _BTR_CONVERT(what, to) ((to)(what))\n"
                 "#endif\n"); 
