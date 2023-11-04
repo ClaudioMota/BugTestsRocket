@@ -235,26 +235,6 @@ int _doRunTest(char* testProgram)
   return WEXITSTATUS(status);
 }
 
-void _mock(char* file, int line, char* functionName, void* function, FunctionMock* mocks)
-{
-  void** mockPointer = 0;
-  for(int i = 0; mocks[i].set; i++)
-  {
-    if(strcmp(mocks[i].name, functionName) == 0)
-    {
-      mockPointer = (void**)mocks[i].mockPointer;
-      break;
-    }
-  }
-
-  char message[_BTR_MAX_NAME_SIZE];
-  strcpy(message, "Could not mock function ");
-  strcat(message, functionName);
-  if(!mockPointer) onFail(file, line, message);
-
-  *mockPointer = function;
-}
-
 // Allocates and sets to output a list with all test files in the directory and subdirectories of the test runner
 // Returns the count of files
 bool _isDirectory(char* file);

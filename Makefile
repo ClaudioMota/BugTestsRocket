@@ -17,7 +17,7 @@ test: build/libExampleTest.a $(C_TEST_OBJECTS)
 build/libExample.a: prepare $(C_OBJECTS)
 	ar rcs $@ $(C_OBJECTS)
 
-build/libExampleTest.a: build/libExample.a build/mock.c
+build/libExampleTest.a: build/libExample.a
 
 build/%Cpp.o : %Cpp.cpp
 	$(CPP) $(C_FLAGS) $(INCLUDE_PATH) -c $< -o $@
@@ -25,17 +25,17 @@ build/%Cpp.o : %Cpp.cpp
 build/%.o : %.c
 	$(CC) $(C_FLAGS) $(INCLUDE_PATH) -c $< -o $@
 
-build/mock.c: build/tests/mockator
-	build/tests/mockator
+tests/mocks.h: build/tests/test
+	build/tests/test --generate-mocks
 
-build/tests/mockator: tests/mockator.c
-	$(CC) $(C_FLAGS) $(INCLUDE_PATH) -g -Itests -Lbuild $< -o $@ -lExample
+build/tests/test: tests/test.c
+	$(CC) $(C_FLAGS) $(INCLUDE_PATH) -g -Itests $< -o $@
 
-build/tests/%: tests/%.c
-	$(CC) $(C_FLAGS) $(INCLUDE_PATH) -g -Itests -Lbuild build/mocks.c $< -o $@ -lExampleTest
+build/tests/%: tests/%.c tests/mocks.h
+	$(CC) $(C_FLAGS) $(INCLUDE_PATH) -g -Itests -Lbuild $< -o $@ -lExampleTest
 
 build/tests/%: tests/%.cpp
-	$(CPP) $(C_FLAGS) $(INCLUDE_PATH) -g -Itests -Lbuild build/mocks.c $< -o $@ -lExampleTest
+	$(CPP) $(C_FLAGS) $(INCLUDE_PATH) -g -Itests -Lbuild $< -o $@ -lExampleTest
 
 prepare:
 	mkdir -p build/example
