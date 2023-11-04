@@ -1,4 +1,5 @@
 #include "test.h"
+#include "mocks.h"
 #include "exampleMock.h"
 
 static int expectedInput = 0;

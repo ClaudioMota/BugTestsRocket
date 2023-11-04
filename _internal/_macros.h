@@ -23,8 +23,8 @@
 // See https://github.com/ClaudioMota/BugTestsRocket/ for updated versions
 // If this file is incomplete try running _internal/mergeHeaders.sh before copying
 
-#ifndef TEST_HEADER
-#define TEST_HEADER 1
+#ifndef BUG_TESTS_ROCKET_TEST_HEADER
+#define BUG_TESTS_ROCKET_TEST_HEADER 1
 
 #ifdef __cplusplus
 extern "C"
@@ -69,7 +69,13 @@ extern "C"
     _testRunning++;\
     setupFunction();
 
-#define mock(function, newFunction) _mock(_C_STRING_LITERAL(__FILE__), __LINE__, _C_STRING_LITERAL(#function), (void*)newFunction, _mocks);
+#define mock(function, newFunction) _mock(_C_STRING_LITERAL(__FILE__), __LINE__, _C_STRING_LITERAL(#function), (void*)newFunction, _mocks)
+
+#define mockReset(function) _mockReset(_C_STRING_LITERAL(__FILE__), __LINE__, _C_STRING_LITERAL(#function), (void*)newFunction, _mocks)
+
+#define mockCalls(function) _getMock(_C_STRING_LITERAL(__FILE__), __LINE__, _C_STRING_LITERAL(#function), _mocks)->calls
+
+#define mockGetOrginal(function) _getMock(_C_STRING_LITERAL(__FILE__), __LINE__, _C_STRING_LITERAL(#function), _mocks)->original
 
 #define helperBlockAs(env, type, index) (type*)&(((char*)env->helperBlock)[sizeof(type)*index])
 

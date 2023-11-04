@@ -3,6 +3,8 @@
 typedef struct _TestSelect _TestSelect;
 typedef struct _TestContext _TestContext;
 typedef struct TestEnvironment TestEnvironment;
+typedef struct FunctionMock FunctionMock;
+typedef struct FunctionDescriptor FunctionDescriptor;
 
 enum _TestSelectMode
 {
@@ -22,6 +24,8 @@ struct _TestSelect
 struct _TestContext
 {
   bool set;
+  FunctionMock* mocksPointer;
+  void** mocksSnapshot;
   void (*setupFunction)();
   void (*cleanFunction)();
   void (*onFail)(char* file, int line, char* expr);
@@ -44,6 +48,22 @@ struct TestEnvironment
   void* helperBlock[_TEST_HELPER_BLOCK_SIZE];
 };
 
+struct FunctionMock
+{
+  bool set;
+  int calls;
+  void* mockPointer;
+  const char* name;
+  void* original;
+};
+
+struct FunctionDescriptor
+{
+  char returnType[32];
+  char name[_BTR_MAX_NAME_SIZE];
+  char args[_BTR_MAX_NAME_SIZE];
+};
+
 void _ignore();
 void _defaultTestPass();
 void _defaultFailure(char* file, int line, char* expr);
@@ -60,7 +80,28 @@ char* _sourceFile;
 TestEnvironment* testEnv = 0;
 extern FunctionMock _mocks[];
 
-void _setContext(char* contextName)
+void _snapShotGlobalMocks()
+{
+  if(!testEnv->globalContext.mocksPointer || testEnv->globalContext.mocksSnapshot) return;
+  int count = 0;  
+  while(testEnv->globalContext.mocksPointer[count].set){count++;}
+  count++;
+  testEnv->globalContext.mocksSnapshot = (void**)malloc(sizeof(void*)*(count));
+  for(int i = 0; i < count-1; i++)
+    testEnv->globalContext.mocksSnapshot[i] = *((void**)testEnv->globalContext.mocksPointer[i].mockPointer);
+}
+
+void _recoverGlobalMocksSnapShot()
+{
+  if(!testEnv->globalContext.mocksSnapshot || !testEnv->globalContext.mocksPointer) return;
+  int count = 0;  
+  while(testEnv->globalContext.mocksPointer[count].set){count++;}
+  count++;
+  for(int i = 0; i < count-1; i++)
+    *((void**)testEnv->globalContext.mocksPointer[i].mockPointer) = testEnv->globalContext.mocksSnapshot[i];
+}
+
+void _maybeSetGlobalContext()
 {
   if(!testEnv->globalContext.set)
   {
@@ -70,17 +111,26 @@ void _setContext(char* contextName)
     testEnv->globalContext.onFail = onFail;
     testEnv->globalContext.onTestPass = onTestPass;
     testEnv->globalContext.onRaise = onRaise;
+
+    _snapShotGlobalMocks();
   }
+}
+
+void _setContext(char* contextName)
+{
+  _maybeSetGlobalContext();
   setupFunction = testEnv->globalContext.setupFunction;
   cleanFunction = testEnv->globalContext.cleanFunction;
   onFail = testEnv->globalContext.onFail;
   onTestPass = testEnv->globalContext.onTestPass;
   onRaise = testEnv->globalContext.onRaise;
   testEnv->_candidateContext = contextName;
+  _recoverGlobalMocksSnapShot();
 }
 
 void _initializeTest(int index, int line, char* description)
 {
+  _maybeSetGlobalContext();
   testEnv->testIndex = index;
   testEnv->testDescription = description;
   testEnv->testLine = __LINE__;
@@ -235,26 +285,6 @@ int _doRunTest(char* testProgram)
   return WEXITSTATUS(status);
 }
 
-void _mock(char* file, int line, char* functionName, void* function, FunctionMock* mocks)
-{
-  void** mockPointer = 0;
-  for(int i = 0; mocks[i].set; i++)
-  {
-    if(strcmp(mocks[i].name, functionName) == 0)
-    {
-      mockPointer = (void**)mocks[i].mockPointer;
-      break;
-    }
-  }
-
-  char message[_BTR_MAX_NAME_SIZE];
-  strcpy(message, "Could not mock function ");
-  strcat(message, functionName);
-  if(!mockPointer) onFail(file, line, message);
-
-  *mockPointer = function;
-}
-
 // Allocates and sets to output a list with all test files in the directory and subdirectories of the test runner
 // Returns the count of files
 bool _isDirectory(char* file);
@@ -372,18 +402,30 @@ int runAllTests(int numArgs, char** args)
 int _testFileMain(int numArgs, char** args, int (*_allTests)())
 {
   args = _copyArgs(numArgs, args);
-  TestEnvironment _testEnv = {0};
+  TestEnvironment _testEnv;
   testEnv = &_testEnv;
-  _testEnv.testContext = _C_STRING_LITERAL("global");
-  _testEnv.testDescription = _C_STRING_LITERAL("setup");
+  void** snapShot;
 
   int signals[] = {SIGABRT, SIGFPE, SIGILL, SIGINT, SIGSEGV, SIGTERM};
   for(unsigned int i = 0; i < sizeof(signals)/sizeof(int); i++)
     signal(signals[i], _defaultRaiseHandler);
+
+  _testEnv = (TestEnvironment){0};
+  _testEnv.testContext = _C_STRING_LITERAL("global");
+  _testEnv.testDescription = _C_STRING_LITERAL("setup");
   int _testCount = _allTests();
-  memset(&_testEnv, 0, sizeof(TestEnvironment));
+  snapShot = _testEnv.globalContext.mocksSnapshot;
+  if(snapShot) free(snapShot);
+  
+  _testEnv = (TestEnvironment){0};
+  _testEnv.testContext = _C_STRING_LITERAL("global");
+  _testEnv.testDescription = _C_STRING_LITERAL("setup");
   _testEnv.selection = _getArgsSelection(numArgs, args);
   _allTests();
+  snapShot = _testEnv.globalContext.mocksSnapshot;
+  if(snapShot) free(snapShot);
+
   _freeArgsCopy();
+  
   return _testCount;
 }
