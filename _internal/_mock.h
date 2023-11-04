@@ -1,24 +1,6 @@
 // This content is part of test.h
 // Mock functionalities
 
-typedef struct FunctionMock FunctionMock;
-typedef struct FunctionDescriptor FunctionDescriptor;
-
-struct FunctionMock
-{
-  bool set;
-  int calls;
-  void* mockPointer;
-  const char* name;
-};
-
-struct FunctionDescriptor
-{
-  char returnType[32];
-  char name[_BTR_MAX_NAME_SIZE];
-  char args[_BTR_MAX_NAME_SIZE];
-};
-
 int _writeArgs(FILE* file, char* args)
 {
   int argsCount = 0;
@@ -53,10 +35,15 @@ void _getMockedName(char* output, char* functioName)
   strcat(output, "🚀");
 }
 
-extern void (*onFail)(char* file, int line, char* expr);
-
 FunctionMock* _getMock(char* file, int line, char* functionName, FunctionMock* mocks)
 {
+  if(!testEnv->globalContext.mocksSnapshot)
+  {
+    testEnv->globalContext.mocksPointer = mocks;
+    if(testEnv->globalContext.set)
+      _snapShotGlobalMocks();
+  }
+  
   FunctionMock* mock = 0;
   for(int i = 0; mocks[i].set; i++)
   {
@@ -79,6 +66,12 @@ void _mock(char* file, int line, char* functionName, void* function, FunctionMoc
 {
   FunctionMock* mock = _getMock(file, line, functionName, mocks);
   if(mock) *((void**)mock->mockPointer) = function;
+}
+
+void _mockReset(char* file, int line, char* functionName, void* function, FunctionMock* mocks)
+{
+  FunctionMock* mock = _getMock(file, line, functionName, mocks);
+  if(mock) *((void**)mock->mockPointer) = mock->original;
 }
 
 bool _createMockFile(char* mockFilePath, int functionCount, FunctionDescriptor* functions)
@@ -118,9 +111,11 @@ bool _createMockFile(char* mockFilePath, int functionCount, FunctionDescriptor* 
   fprintf(file, "FunctionMock _mocks[] = {\n");
   for(int i = 0; i < functionCount; i++)
   {
-    fprintf(file, "  {true, (int)0, (void*)&_mocked_%s, \"%s\"},\n", functions[i].name, functions[i].name);
+    char mockedName[_BTR_MAX_NAME_SIZE];
+    _getMockedName(mockedName, functions[i].name);
+    fprintf(file, "  {true, (int)0, (void*)&_mocked_%s, \"%s\", _BTR_CONVERT(%s, void*)},\n", functions[i].name, functions[i].name, mockedName);
   }
-  fprintf(file, "  {false, (int)0, (void*)0, \"\"}\n};\n");
+  fprintf(file, "  {false, (int)0, (void*)0, \"\", (void*)0}\n};\n");
   fprintf(file, "#ifdef __cplusplus\n}\n#endif\n#endif\n"); 
 
   fclose(file);

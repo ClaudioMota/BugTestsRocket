@@ -14,9 +14,9 @@ void* _mocked__ZN7MyClass15internalProcessEv = _BTR_CONVERT(🐛_ZN7MyClass15int
 int getRandomInput(){ _mocks[0].calls++; return _BTR_CONVERT(_mocked_getRandomInput, int (*)())(); }
 void _ZN7MyClass15internalProcessEv(void* a0){ _mocks[1].calls++; return _BTR_CONVERT(_mocked__ZN7MyClass15internalProcessEv, void (*)(void*))(a0); }
 FunctionMock _mocks[] = {
-  {true, (int)0, (void*)&_mocked_getRandomInput, "getRandomInput"},
-  {true, (int)0, (void*)&_mocked__ZN7MyClass15internalProcessEv, "_ZN7MyClass15internalProcessEv"},
-  {false, (int)0, (void*)0, ""}
+  {true, (int)0, (void*)&_mocked_getRandomInput, "getRandomInput", _BTR_CONVERT(🐛getRandomInput🚀, void*)},
+  {true, (int)0, (void*)&_mocked__ZN7MyClass15internalProcessEv, "_ZN7MyClass15internalProcessEv", _BTR_CONVERT(🐛_ZN7MyClass15internalProcessEv🚀, void*)},
+  {false, (int)0, (void*)0, "", (void*)0}
 };
 #ifdef __cplusplus
 }
