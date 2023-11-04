@@ -537,6 +537,7 @@ struct FunctionDescriptor
   char returnType[32];
   char name[_BTR_MAX_NAME_SIZE];
   char args[_BTR_MAX_NAME_SIZE];
+  char* implementation;
 };
 
 void _ignore();
@@ -915,7 +916,7 @@ int _writeArgs(FILE* file, char* args)
   int a = 0;
   for(int i = 0; i <= argsSize; i++)
   {
-    if(!isspace(args[i]) || !args[i])
+    if((!isspace(args[i]) || a) || !args[i])
     {
       if(args[i] == '\0' || args[i] == ',')
       {
@@ -923,7 +924,8 @@ int _writeArgs(FILE* file, char* args)
         {
           arg[a] = '\0';
           if(argsCount > 0) fprintf(file, ",");
-          fprintf(file, "%s a%i", arg, argsCount++);
+          if(arg[0] != '.') fprintf(file, "%s a%i", arg, argsCount++);
+          else fprintf(file, "%s", arg);
         }
         a = 0;
       }
@@ -998,7 +1000,9 @@ bool _createMockFile(char* mockFilePath, int functionCount, FunctionDescriptor* 
   {
     char mockedName[_BTR_MAX_NAME_SIZE];
     _getMockedName(mockedName, functions[i].name);
-    fprintf(file, "%s %s(%s);\n", functions[i].returnType, mockedName, functions[i].args);
+    char* implementation = _C_STRING_LITERAL(";");
+    if(functions[i].implementation) implementation = functions[i].implementation;
+    fprintf(file, "%s %s(%s)%s\n", functions[i].returnType, mockedName, functions[i].args, implementation);
     fprintf(file, "void* _mocked_%s = _BTR_CONVERT(%s, void*);\n", functions[i].name, mockedName);
   }
   for(int i = 0; i < functionCount; i++)
