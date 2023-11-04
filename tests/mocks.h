@@ -3,7 +3,7 @@
 #ifdef BUG_TESTS_ROCKET_TEST_HEADER
 #ifdef __cplusplus
 extern "C"{
-#define _BTR_CONVERT(what, to) reiterpret_cast<to>(what)
+#define _BTR_CONVERT(what, to) reinterpret_cast<to>(what)
 #else
 #define _BTR_CONVERT(what, to) ((to)(what))
 #endif
