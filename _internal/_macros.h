@@ -50,9 +50,9 @@ extern "C"
 
 #define _TEST_HELPER_BLOCK_SIZE 10240
 #define assert(boolean) _assert(_C_STRING_LITERAL(__FILE__), __LINE__, boolean, _C_STRING_LITERAL(#boolean))
-#define assert_called(mockedFunction) assert(mockCalled(mockedFunction) > 0)
+#define assert_called(mockedFunction) assert(mockCalls(mockedFunction) > 0)
 #define refute(boolean) _assert(_C_STRING_LITERAL(__FILE__), __LINE__, !(boolean), _C_STRING_LITERAL(#boolean))
-#define refute_called(mockedFunction) assert(mockCalled(mockedFunction) == 0)
+#define refute_called(mockedFunction) assert(mockCalls(mockedFunction) == 0)
 
 #define beginTests \
   int _allTests(){ int _testCount = 0; int _testRunning = 0; int _testDefinition = 0; {
