@@ -1058,7 +1058,7 @@ bool createMocks(char* libPath, char* mockableLibPath, char* mockFilePath, int f
     
       for(int i = 0; i < lib.fileCount; i++)
       {
-        if(memcmp(lib.files[i].fileInfo, "/", 1) != 0)
+        if(memcmp(lib.files[i].fileInfo, "//", 2) != 0)
           if(!_objectFileMockFunction(&lib.files[i], functions[f].name, mockedName))
               printf("Could not mock object file %s. Supported formats are ELF64. Symbols must be relocatable. Maybe try adding --fPIC to your compiler flags?\n",
                     lib.files[i].fileInfo);
