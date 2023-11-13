@@ -10,7 +10,7 @@ int doCreateMocks()
   return !createMocks(
     "build/libExample.a",
     "build/libExampleTest.a",
-    "tests/mocks.h",
+    "build/mocks.c",
     sizeof(functions)/sizeof(FunctionDescriptor), functions
   );
 }
