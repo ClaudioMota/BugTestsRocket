@@ -13,7 +13,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-
+      - name: Check test.h up to date
+        run: |
+          _internal/mergeHeaders.sh
+          EMPTY="$(git diff)"
+          if [ "$EMPTY" != "" ]; then
+            echo "test.h is outdated. Run _internal/mergeHeaders.sh and commit the changes to fix this."
+            exit 1
+          fi
       - name: Build
         run: |
           make
