@@ -102,15 +102,11 @@ bool _createMockFile(char* mockFilePath, int functionCount, FunctionDescriptor* 
   }
   for(int i = 0; i < functionCount; i++)
   {
-    fprintf(file, "%s %s(", functions[i].returnType, functions[i].name);
-    int argsCount = _writeArgs(file, functions[i].args);
-    fprintf(file, "){ _mocks[%i].calls++; return _BTR_CONVERT(_mocked_%s, %s (*)(%s))(",
-      i, functions[i].name, functions[i].returnType, functions[i].args);
-    for(int a = 0; a < argsCount; a++)
-      if(a)
-        fprintf(file, ", a%i", a);
-      else
-        fprintf(file, "a%i", a);
+    fprintf(file, "void %s(", functions[i].name);
+    _writeArgs(file, functions[i].args);
+    fprintf(
+      file, "){ _mocks[%i].calls++; return _BTR_CONVERT(_mocked_%s, void (*)())(", i, functions[i].name);
+    fprintf(file, "); }\n");
   }
   fprintf(file, "FunctionMock _mocks[] = {\n");
   for(int i = 0; i < functionCount; i++)
