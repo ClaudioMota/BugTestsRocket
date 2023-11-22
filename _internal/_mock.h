@@ -111,6 +111,7 @@ bool _createMockFile(char* mockFilePath, int functionCount, FunctionDescriptor* 
         fprintf(file, ", a%i", a);
       else
         fprintf(file, "a%i", a);
+    fprintf(file, "); }\n");
   }
   fprintf(file, "FunctionMock _mocks[] = {\n");
   for(int i = 0; i < functionCount; i++)
