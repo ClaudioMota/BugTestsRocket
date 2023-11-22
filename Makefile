@@ -25,17 +25,17 @@ build/%Cpp.o : %Cpp.cpp
 build/%.o : %.c
 	$(CC) $(C_FLAGS) $(INCLUDE_PATH) -c $< -o $@
 
-tests/mocks.h: build/tests/test
+build/mocks.c: build/tests/test
 	build/tests/test --generate-mocks
 
 build/tests/test: tests/test.c
 	$(CC) $(C_FLAGS) $(INCLUDE_PATH) -g -Itests $< -o $@
 
-build/tests/%: tests/%.c tests/mocks.h
-	$(CC) $(C_FLAGS) $(INCLUDE_PATH) -g -Itests -Lbuild $< -o $@ -lExampleTest
+build/tests/%: tests/%.c build/mocks.c
+	$(CC) $(C_FLAGS) $(INCLUDE_PATH) -g -Itests -Lbuild build/mocks.c $< -o $@ -lExampleTest
 
-build/tests/%: tests/%.cpp
-	$(CPP) $(C_FLAGS) $(INCLUDE_PATH) -g -Itests -Lbuild $< -o $@ -lExampleTest
+build/tests/%: tests/%.cpp build/mocks.c
+	$(CPP) $(C_FLAGS) $(INCLUDE_PATH) -g -Itests -Lbuild build/mocks.c $< -o $@ -lExampleTest
 
 prepare:
 	mkdir -p build/example

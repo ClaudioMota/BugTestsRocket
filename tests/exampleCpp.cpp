@@ -1,6 +1,5 @@
 #include "test.h"
 #include "exampleCpp.h"
-#include "mocks.h"
 
 void simulateProcess(MyClass* myClass)
 {
