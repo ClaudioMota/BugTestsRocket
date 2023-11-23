@@ -896,6 +896,7 @@ int _testFileMain(int numArgs, char** args, int (*_allTests)())
   _testEnv.testContext = _C_STRING_LITERAL("global");
   _testEnv.testDescription = _C_STRING_LITERAL("setup");
   int _testCount = _allTests();
+  _recoverGlobalMocksSnapShot();
   snapShot = _testEnv.globalContext.mocksSnapshot;
   if(snapShot) free(snapShot);
   
