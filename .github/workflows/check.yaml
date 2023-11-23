@@ -29,6 +29,6 @@ jobs:
         run: |
           set +e
           test="$(build/tests/test)"
-          if [ $? != 2 ]; then
+          if [ $? != 1 ]; then
             exit 1
           fi
