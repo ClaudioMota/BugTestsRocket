@@ -23,7 +23,7 @@ jobs:
           fi
       - name: Build
         run: |
-          make
+          make build-all
 
       - name: Test
         run: |
