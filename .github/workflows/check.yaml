@@ -23,12 +23,12 @@ jobs:
           fi
       - name: Build
         run: |
-          make
+          make build-all
 
       - name: Test
-        continue-on-error: true
         run: |
-          test=$(build/tests/test)
+          set +e
+          test="$(build/tests/test)"
           if [ $? != 2 ]; then
             exit 1
           fi
