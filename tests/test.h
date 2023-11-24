@@ -361,7 +361,7 @@ bool _objectFileElfIsGlobalFunctionDefinedHere(_ElfSymbol* symbol)
 {
   int binding = (symbol->st_info >> 4) & 0xF; // 0 is local
   int type = symbol->st_info & 0xF; // 2 is function
-  return binding != 0 && type == 2 && symbol->st_value != 0;
+  return binding != 0 && type == 2 && symbol->st_shndx != 0;
 }
 
 void _objectFileMockElfSymbol(_StaticLibFile* libFile, _ElfHeader header, _ElfSectionHeader* sections, _ElfSectionHeader* symbolTable, _ElfSymbol* symbol, char* to)
